@@ -1,0 +1,436 @@
+﻿forge 1101 {
+	skillHandle BS_SWORD
+	reqItem 613
+	item 998 {
+		amount 2
+	}
+}
+forge 1104 {
+	skillHandle BS_SWORD
+	reqItem 613
+	item 998 {
+		amount 30
+	}
+}
+forge 1107 {
+	skillHandle BS_SWORD
+	reqItem 613
+	item 913 {
+		amount 25
+	} item 998 {
+		amount 45
+	}
+}
+forge 1110 {
+	skillHandle BS_SWORD
+	reqItem 614
+	item 999 {
+		amount 20
+	}
+}
+forge 1113 {
+	skillHandle BS_SWORD
+	reqItem 614
+	item 999 {
+		amount 35
+	}
+}
+forge 1122 {
+	skillHandle BS_SWORD
+	reqItem 614
+	item 920 {
+		amount 50
+	} item 999 {
+		amount 40
+	}
+}
+forge 1126 {
+	skillHandle BS_SWORD
+	reqItem 615
+	item 727 {
+		amount 1
+	} item 984 {
+		amount 8
+	} item 999 {
+		amount 5
+	}
+}
+forge 1123 {
+	skillHandle BS_SWORD
+	reqItem 615
+	item 728 {
+		amount 1
+	} item 984 {
+		amount 8
+	} item 999 {
+		amount 10
+	}
+}
+forge 1119 {
+	skillHandle BS_SWORD
+	reqItem 615
+	item 718 {
+		amount 1
+	} item 984 {
+		amount 8
+	} item 999 {
+		amount 15
+	}
+}
+forge 1129 {
+	skillHandle BS_SWORD
+	reqItem 615
+	item 724 {
+		amount 1
+	} item 984 {
+		amount 16
+	}
+}
+forge 1201 {
+	skillHandle BS_DAGGER
+	reqItem 613
+	item 909 {
+		amount 10
+	} item 998 {
+		amount 1
+	}
+}
+forge 1204 {
+	skillHandle BS_DAGGER
+	reqItem 613
+	item 998 {
+		amount 25
+	}
+}
+forge 1207 {
+	skillHandle BS_DAGGER
+	reqItem 613
+	item 998 {
+		amount 50
+	}
+}
+forge 1210 {
+	skillHandle BS_DAGGER
+	reqItem 614
+	item 999 {
+		amount 17
+	}
+}
+forge 1213 {
+	skillHandle BS_DAGGER
+	reqItem 614
+	item 999 {
+		amount 30
+	}
+}
+forge 1216 {
+	skillHandle BS_DAGGER
+	reqItem 614
+	item 999 {
+		amount 40
+	}
+}
+forge 1219 {
+	skillHandle BS_DAGGER
+	reqItem 615
+	item 726 {
+		amount 1
+	} item 984 {
+		amount 4
+	} item 999 {
+		amount 40
+	}
+}
+forge 1222 {
+	skillHandle BS_DAGGER
+	reqItem 615
+	item 729 {
+		amount 1
+	} item 984 {
+		amount 4
+	} item 999 {
+		amount 60
+	}
+}
+forge 1116 {
+	skillHandle BS_TWOHANDSWORD
+	reqItem 613
+	item 958 {
+		amount 15
+	} item 998 {
+		amount 35
+	}
+}
+forge 1151 {
+	skillHandle BS_TWOHANDSWORD
+	reqItem 614
+	item 957 {
+		amount 20
+	} item 999 {
+		amount 25
+	}
+}
+forge 1154 {
+	skillHandle BS_TWOHANDSWORD
+	reqItem 614
+	item 999 {
+		amount 45
+	}
+}
+forge 1157 {
+	skillHandle BS_TWOHANDSWORD
+	reqItem 615
+	item 984 {
+		amount 12
+	} item 999 {
+		amount 10
+	}
+}
+forge 1160 {
+	skillHandle BS_TWOHANDSWORD
+	reqItem 615
+	item 984 {
+		amount 12
+	} item 999 {
+		amount 20
+	}
+}
+forge 1163 {
+	skillHandle BS_TWOHANDSWORD
+	reqItem 615
+	item 733 {
+		amount 1
+	} item 984 {
+		amount 16
+	} item 999 {
+		amount 20
+	}
+}
+forge 1301 {
+	skillHandle BS_AXE
+	reqItem 613
+	item 998 {
+		amount 10
+	}
+}
+forge 1351 {
+	skillHandle BS_AXE
+	reqItem 613
+	item 998 {
+		amount 110
+	}
+}
+forge 1354 {
+	skillHandle BS_AXE
+	reqItem 614
+	item 999 {
+		amount 30
+	}
+}
+forge 1357 {
+	skillHandle BS_AXE
+	reqItem 615
+	item 922 {
+		amount 30
+	} item 984 {
+		amount 4
+	} item 999 {
+		amount 20
+	}
+}
+forge 1360 {
+	skillHandle BS_AXE
+	reqItem 615
+	item 719 {
+		amount 1
+	} item 984 {
+		amount 8
+	} item 999 {
+		amount 10
+	}
+}
+forge 1501 {
+	skillHandle BS_MACE
+	reqItem 613
+	item 998 {
+		amount 3
+	}
+}
+forge 1504 {
+	skillHandle BS_MACE
+	reqItem 613
+	item 998 {
+		amount 30
+	}
+}
+forge 1507 {
+	skillHandle BS_MACE
+	reqItem 614
+	item 999 {
+		amount 20
+	}
+}
+forge 1510 {
+	skillHandle BS_MACE
+	reqItem 614
+	item 999 {
+		amount 33
+	}
+}
+forge 1519 {
+	skillHandle BS_MACE
+	reqItem 614
+	item 999 {
+		amount 45
+	}
+}
+forge 1513 {
+	skillHandle BS_MACE
+	reqItem 615
+	item 730 {
+		amount 1
+	} item 999 {
+		amount 85
+	}
+}
+forge 1516 {
+	skillHandle BS_MACE
+	reqItem 615
+	item 963 {
+		amount 20
+	} item 999 {
+		amount 100
+	}
+}
+forge 1522 {
+	skillHandle BS_MACE
+	reqItem 615
+	item 968 {
+		amount 1
+	} item 999 {
+		amount 120
+	}
+}
+forge 1801 {
+	skillHandle BS_KNUCKLE
+	reqItem 613
+	item 722 {
+		amount 1
+	} item 998 {
+		amount 160
+	}
+}
+forge 1803 {
+	skillHandle BS_KNUCKLE
+	reqItem 614
+	item 999 {
+		amount 50
+	}
+}
+forge 1805 {
+	skillHandle BS_KNUCKLE
+	reqItem 614
+	item 999 {
+		amount 65
+	}
+}
+forge 1807 {
+	skillHandle BS_KNUCKLE
+	reqItem 615
+	item 723 {
+		amount 10
+	} item 984 {
+		amount 4
+	}
+}
+forge 1809 {
+	skillHandle BS_KNUCKLE
+	reqItem 615
+	item 728 {
+		amount 10
+	} item 984 {
+		amount 8
+	}
+}
+forge 1811 {
+	skillHandle BS_KNUCKLE
+	reqItem 615
+	item 727 {
+		amount 10
+	} item 984 {
+		amount 4
+	}
+}
+forge 1401 {
+	skillHandle BS_SPEAR
+	reqItem 613
+	item 998 {
+		amount 3
+	}
+}
+forge 1404 {
+	skillHandle BS_SPEAR
+	reqItem 613
+	item 998 {
+		amount 35
+	}
+}
+forge 1407 {
+	skillHandle BS_SPEAR
+	reqItem 613
+	item 998 {
+		amount 70
+	}
+}
+forge 1451 {
+	skillHandle BS_SPEAR
+	reqItem 614
+	item 999 {
+		amount 25
+	}
+}
+forge 1454 {
+	skillHandle BS_SPEAR
+	reqItem 614
+	item 999 {
+		amount 40
+	}
+}
+forge 1457 {
+	skillHandle BS_SPEAR
+	reqItem 614
+	item 999 {
+		amount 55
+	}
+}
+forge 1460 {
+	skillHandle BS_SPEAR
+	reqItem 615
+	item 720 {
+		amount 5
+	} item 984 {
+		amount 8
+	} item 999 {
+		amount 10
+	}
+}
+forge 1463 {
+	skillHandle BS_SPEAR
+	reqItem 615
+	item 984 {
+		amount 12
+	} item 999 {
+		amount 10
+	}
+}
+forge 1410 {
+	skillHandle BS_SPEAR
+	reqItem 615
+	item 723 {
+		amount 3
+	} item 923 {
+		amount 2
+	} item 984 {
+		amount 12
+	}
+}
