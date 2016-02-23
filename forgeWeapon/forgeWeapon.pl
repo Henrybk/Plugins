@@ -52,13 +52,19 @@ my %elementalStonesIds = ('994' => 1, '995' => 1, '996' => 1, '997' => 1);
 my $starCrumbID = 1000;
 
 my @Ids;
+
+my $sentForge = 0;
+
+my $starCrumbCount = 0;
+my $elementalID = 0;
  
 #########
 # startup
 Plugins::register('forgeWeapon', 'Enables weapon creation', \&Unload, \&Unload);
 
 my $hooks = Plugins::addHooks(
-	['packet_pre/forge_list',\&on_forge_list, undef],
+	['packet_pre/forge_list', \&on_forge_list, undef],
+	['packet_pre/refine_result', \&on_refine_result, undef],
 	['start3', \&parseForgeItems, undef]
 );
  
@@ -73,7 +79,29 @@ sub Unload {
 }
 
 sub on_forge_list {
+	$sentForge = 1;
 	$messageSender->sendProduceMix($Ids[0], $Ids[1], $Ids[2], $Ids[3]);
+}
+
+sub on_refine_result {
+	my (undef, $args) = @_;
+	if (($args->{fail} == 0 || $args->{fail} == 1) && $sentForge) {
+		$sentForge = 0;
+		if ($starCrumbCount) {
+			my $item = $char->inventory->getByNameID($starCrumbID);
+			if ($item) {
+				inventoryItemRemoved($item->{invIndex}, $starCrumbCount);
+				Plugins::callHook('packet_item_removed', {index => $item->{invIndex}});
+			}
+		}
+		if ($elementalID) {
+			my $item = $char->inventory->getByNameID($elementalID);
+			if ($item) {
+				inventoryItemRemoved($item->{invIndex}, 1);
+				Plugins::callHook('packet_item_removed', {index => $item->{invIndex}});
+			}
+		}
+	}
 }
  
 sub commandHandler {
@@ -99,24 +127,27 @@ sub checkCanForge {
 
 	my $forgeID = shift(@itemIds);
 
+	$starCrumbCount = 0;
+	$elementalID = 0;
+
 	#Check if the item exists in the hash %weapons
 	if (!exists $weapons{$forgeID}) {
 		error "[forgeWeapon] The weapon id you provided is not known\n";
 		return 0;
 	}
-	
+
 	#Check if we have the hammer
 	if (!$char->inventory->getByNameID($weapons{$forgeID}{'reqItem'})) {
 		error "[forgeWeapon] You do not have the required hammer\n";
 		return 0;
 	}
-	
+
 	#Check if we have the skill
 	if (!$char->getSkillLevel(new Skill(handle => $weapons{$forgeID}{'skillHandle'}))) {
 		error "[forgeWeapon] You do not have the required skill\n";
 		return 0;
 	}
-	
+
 	#Check id we have enough materials
 	my $item;
 	my $wantedAmount;
@@ -136,8 +167,7 @@ sub checkCanForge {
 		undef $wantedAmount;
 	}
 	
-	my $starCrumbCount = 0;
-	my $elementalID = 0;
+
 	foreach my $extraID (@itemIds) {
 		if ($extraID == $starCrumbID) {
 			$starCrumbCount++;
@@ -147,9 +177,13 @@ sub checkCanForge {
 				error "[forgeWeapon] You cannot use two elemental stones (".$items_lut{$elementalID}." and ".$items_lut{$extraID}.").\n";
 				return 0;
 			} else {
-				next if ($char->inventory->getByNameID($extraID));
-				error "[forgeWeapon] You do not have the material ".$items_lut{$extraID}."\n";
-				return 0;
+				if ($char->inventory->getByNameID($extraID)) {
+					$elementalID = $extraID;
+					next;
+				} else {
+					error "[forgeWeapon] You do not have the material ".$items_lut{$extraID}."\n";
+					return 0;
+				}
 			}
 		} else {
 			error "[forgeWeapon] The item ".$items_lut{$extraID}." is not a Star Crumb neither an elemental stone\n";
