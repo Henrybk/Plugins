@@ -21,7 +21,7 @@ Plugins::register('shopper', 'automatically buy items from merchant vendors', \&
 
 my $base_hooks = Plugins::addHooks(
 	['postloadfiles', \&checkConfig],
-    ['configModify',  \&on_configModify]
+	['configModify',  \&on_configModify]
 );
 
 use constant {
