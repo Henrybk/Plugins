@@ -15,25 +15,19 @@ use Misc;
 use Network;
 use Network::Send;
 use POSIX;
+use I18N qw(bytesToString stringToBytes);
 
 Plugins::register('shopper', 'automatically buy items from merchant vendors', \&Unload);
-my $AI_pre = Plugins::addHook('AI_pre', \&AI_pre);
-my $encounter = Plugins::addHook('packet_vender', \&encounter);
-my $lost = Plugins::addHook('packet/vender_lost', \&lost);
-my $storeList = Plugins::addHook('packet_vender_store', \&storeList);
-my $mapchange = Plugins::addHook('packet_mapChange', \&mapchange);
-my $player_disappeared = Plugins::addHook('player_disappeared', \&player_disappeared);
 
-my @vendorList;
+my $base_hooks = Plugins::addHooks(
+	['postloadfiles', \&checkConfig],
+    ['configModify',  \&on_configModify]
+);
 
-sub Unload {
-	Plugins::delHook('AI_pre', $AI_pre);
-	Plugins::delHook('packet_vender', $encounter);
-	Plugins::delHook('packet/vender_lost', $lost);
-	Plugins::delHook('packet_vender_store', $storeList);
-	Plugins::delHook('packet_mapChange', $mapchange);
-	Plugins::delHook('player_disappeared', $player_disappeared);
-}
+use constant {
+	INACTIVE => 0,
+	ACTIVE => 1
+};
 
 my $delay = 1;
 my $time = time;
@@ -42,6 +36,74 @@ my %recently_checked;
 my %in_AI_queue;
 
 my $recheck_timeout = 300;
+
+my $shopping_hooks;
+
+my $status = INACTIVE;
+
+sub Unload {
+	Plugins::delHook($base_hooks);
+	changeStatus(INACTIVE);
+	message "[shopper] Plugin unloading or reloading.\n", 'success';
+}
+
+sub checkConfig {
+	if (exists $config{shopper_on} && $config{shopper_on} == 1) {
+		message "[shopper] Config set to 'on' shopper will be active.\n", 'success';
+		return changeStatus(ACTIVE);
+	} else {
+		message "[shopper] Config set to 'off' shopper will be inactive.\n", 'success';
+		return changeStatus(INACTIVE);
+	}
+}
+
+sub on_configModify {
+	my (undef, $args) = @_;
+	return unless ($args->{key} eq 'shopper_on');
+	return if ($args->{val} eq $config{shopper_on});
+	if ($args->{val} == 1) {
+		message "[shopper] Config set to 'on' shopper will be active.\n", 'success';
+		return changeStatus(ACTIVE);
+	} else {
+		message "[shopper] Config set to 'on' shopper will be active.\n", 'success';
+		return changeStatus(INACTIVE);
+	}
+}
+
+sub changeStatus {
+	my $new_status = shift;
+	
+	return if ($new_status == $status);
+	
+	if ($new_status == INACTIVE) {
+		Plugins::delHook($shopping_hooks);
+		debug "[shopper] Plugin stage changed to 'INACTIVE'\n", "shopper", 1;
+		AI::clear('checkShop');
+		undef %recently_checked;
+		undef %in_AI_queue;
+		
+	} elsif ($new_status == ACTIVE) {
+		$shopping_hooks = Plugins::addHooks(
+			['AI_pre', \&AI_pre],
+			['packet_vender', \&encounter],
+			['packet_vender_store', \&storeList],
+			['packet_mapChange', \&mapchange],
+			['player_disappeared', \&player_disappeared]
+		);
+		debug "[shopper] Plugin stage changed to 'ACTIVE'\n", "shopper", 1;
+		
+		foreach my $vender_index (0..$#venderListsID) {
+			my $venderID = $venderListsID[$vender_index];
+			next unless (defined $venderID);
+			my $vender = $venderLists{$venderID};
+			
+			debug "[shopper] Adding shop '".$vender->{'title'}."' of player '".get_player_name($venderID)."' to AI queue check list.\n", "shopper", 1;
+			AI::queue('checkShop', {vendorID => $venderID});
+		}
+	}
+	
+	$status = $new_status;
+}
 
 sub mapchange {
 	if (AI::inQueue('checkShop')) {
@@ -60,10 +122,11 @@ sub get_player_name {
 sub AI_pre {
 	if (AI::is('checkShop') && main::timeOut($time, $delay)) {
 		my $vendorID = AI::args->{vendorID};
-		
-		debug "[shopper] Openning shopp of player ".get_player_name($vendorID).".\n", "shopper", 1;
-		
-		$messageSender->sendEnteringVender($vendorID) if (grep { $vendorID eq $_ } @venderListsID);
+		my $vender = $venderLists{$vendorID};
+		if (defined $vender && grep { $vendorID eq $_ } @venderListsID) {
+			debug "[shopper] Openning shop '".$vender->{'title'}."' of player ".get_player_name($vendorID).".\n", "shopper", 1;
+			$messageSender->sendEnteringVender($vendorID);
+		}
 		delete $in_AI_queue{$vendorID};
 		AI::dequeue;
 	}
@@ -74,11 +137,12 @@ sub AI_pre {
 sub encounter {
 	my ($packet, $args) = @_;
 	my $ID = $args->{ID};
+	my $title = bytesToString($args->{title});
 	
 	if (!exists $in_AI_queue{$ID}) {
 		if ( !exists $recently_checked{$ID} || ( exists $recently_checked{$ID} && main::timeOut($recently_checked{$ID}, $recheck_timeout) ) ) {
 			$in_AI_queue{$ID} = 1;
-			debug "[shopper] Adding player ".get_player_name($ID)." to AI queue check list.\n", "shopper", 1;
+			debug "[shopper] Adding shop '".$title."' of player ".get_player_name($ID)." to AI queue check list.\n", "shopper", 1;
 			AI::queue('checkShop', {vendorID => $ID});
 		}
 	}
