@@ -87,12 +87,17 @@ sub on_sell_result {
 
 sub on_skill_used_no_damage {
 	my ($self, $args) = @_;
-	if ($args->{skillID} = 211) {
-		$stealCoinZeny += $lastZeny;
-		message "[zenyLog] Zeny added to Steal Coin log: $lastZeny\n";
-		message "[zenyLog] Total Steal Coin log zeny: $stealCoinZeny\n";
-		$lastZeny = 0;
-	}
+	
+	return unless ($args->{sourceID} eq $char->{ID});
+	
+	return unless ($monsters{$args->{targetID}} && $monsters{$args->{targetID}}{nameID});
+	
+	return unless ($args->{skillID} == 211);
+	
+	$stealCoinZeny += $lastZeny;
+	message "[zenyLog] Zeny added to Steal Coin log: $lastZeny\n";
+	message "[zenyLog] Total Steal Coin log zeny: $stealCoinZeny\n";
+	$lastZeny = 0;
 }
  
 sub commandHandler {
