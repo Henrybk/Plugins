@@ -101,7 +101,7 @@ sub checkConfig {
 sub on_configModify {
 	my (undef, $args) = @_;
 	return unless ($args->{key} eq 'keepPreserveSkill_on' || $args->{key} eq 'keepPreserveSkill_handle' || $args->{key} eq 'keepPreserveSkill_timeout' || $args->{key} eq 'keepPreserveSkill_timeoutCritical');
-	if (validate_settings()) {
+	if (validate_settings($args->{key}, $args->{val})) {
 		changeStatus(ACTIVE);
 	} else {
 		changeStatus(INACTIVE);
