@@ -51,14 +51,17 @@ sub extendedCheck {
 sub onPacketSkillUseNoDamage {
 	my ($self, $args) = @_;
 	
-	return unless ($args->{sourceID} eq $char->{ID});
-	
+	#Monster exists and has a valid ID
 	return unless ($monsters{$args->{targetID}} && $monsters{$args->{targetID}}{nameID});
 	
+	#Skill is coin steal
 	return unless ($args->{skillID} == 211);
 	
 	$monsters{$args->{targetID}}{was_coin_stolen} = 1;
-	message "[StopCoinSteal] Monster ".$monsters{$args->{targetID}}." was coin stolen.\n";
+	
+	my $actor = Actor::get($args->{sourceID});
+	
+	message "[StopCoinSteal] Monster ".$monsters{$args->{targetID}}." was coin stolen by ".$actor.".\n";
 }
 
 1;
