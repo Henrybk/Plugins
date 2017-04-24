@@ -73,13 +73,20 @@ sub on_unload {
 
 sub on_start3 {
     %mobs = %{loadFile(File::Spec->catdir($folder,'mobs_info.json'))};
+	if (!defined %mobs || !%mobs || scalar keys %mobs == 0) {
+		error "[$plugin_name] Could not load mobs info due to a file loading problem.\n.";
+		return;
+	}
 	Log::message( sprintf "[%s] Found %d mobs.\n", $plugin_name, scalar keys %mobs );
 }
 
 sub loadFile {
     my $file = shift;
 
-	open FILE, "<:utf8", $file;
+	unless (open FILE, "<:utf8", $file) {
+		error "[$plugin_name] Could not load file $file.\n.";
+		return;
+	}
 	my @lines = <FILE>;
 	close(FILE);
 	chomp @lines;
