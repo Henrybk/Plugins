@@ -15,7 +15,7 @@
 #      teleToLocation_map pay_fild10      # Map in which you want to use the plugin
 #      teleToLocation_xy 100 150          # X and Y coordinates which you want to get near to by teleporting with the plugin
 #      teleToLocation_distance 10         # Distance to the coordinate set in teleToLocation_xy with which the plugin will stop teleporting and decide it reached the destination
-#      teleToLocation_type steps   # Type of distance to be used in teleToLocation_distance, you can use steps or radius, steps will be the distance the character has to walk to get to teleToLocation_xy and radius will be the arithmetic distance to teleToLocation_xy
+#      teleToLocation_type steps          # Type of distance to be used in teleToLocation_distance, you can use steps or radius, steps will be the distance the character has to walk to get to teleToLocation_xy and radius will be the arithmetic distance to teleToLocation_xy
 #
 ##########################
 package teleToLocation;
