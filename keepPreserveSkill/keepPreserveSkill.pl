@@ -133,45 +133,52 @@ sub validate_settings {
 	
 	my $error = 0;
 	if (!defined $on_off || !defined $handle || !defined $timeout || !defined $timeoutCritical) {
-		message "[$plugin_name] There are config keys not defined, plugin won't be activated.\n","system";
+		message "[$plugin_name] There are config keys not defined.\n","system";
 		$error = 1;
 		
 	} elsif ($on_off !~ /^[01]$/) {
-		message "[$plugin_name] Value of key 'keepPreserveSkill_on' must be 0 or 1, plugin won't be activated.\n","system";
+		message "[$plugin_name] Value of key 'keepPreserveSkill_on' must be 0 or 1.\n","system";
 		$error = 1;
 		
 	} elsif ($timeout !~ /^\d+$/) {
-		message "[$plugin_name] Value of key 'keepPreserveSkill_timeout' must be a number, plugin won't be activated.\n","system";
+		message "[$plugin_name] Value of key 'keepPreserveSkill_timeout' must be a number.\n","system";
 		$error = 1;
 		
 	} elsif ($timeoutCritical !~ /^\d+$/) {
-		message "[$plugin_name] Value of key 'keepPreserveSkill_timeoutCritical' must be a number, plugin won't be activated.\n","system";
+		message "[$plugin_name] Value of key 'keepPreserveSkill_timeoutCritical' must be a number.\n","system";
 		$error = 1;
 	}
 	
 	if ($error == 1) {
-		configModify('keepPreserveSkill_on', 0) if ($on_off != 0);
+		configModify('keepPreserveSkill_on', 0) if (defined $on_off && $on_off != 0);
 		return 0;
 	}
 	
+	return 0 unless ($on_off == 1);
+	
 	if ($char && $net && $net->getState() == Network::IN_GAME) {
-		return 0 unless (check_skills());
-		return $on_off;
+		unless (check_skills()) {
+			configModify('keepPreserveSkill_on', 0);
+			return 0;
+		}
 		
 	} else {
-		if ($on_off == 1 && !defined $in_game_hook) {
+		if (!defined $in_game_hook) {
 			$in_game_hook = Plugins::addHooks(
 				['in_game',  \&on_in_game]
 			);
 		}
 		return 0;
 	}
+	
+	return 1;
 }
 
 sub on_in_game {
 	if (check_skills()) {
 		changeStatus(ACTIVE);
 	} else {
+		configModify('keepPreserveSkill_on', 0);
 		changeStatus(INACTIVE);
 	}
 	Plugins::delHook($in_game_hook);
