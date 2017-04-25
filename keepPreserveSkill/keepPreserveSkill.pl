@@ -34,11 +34,6 @@ use Commands;
 use Actor;
 
 use constant {
-	STALKER => 4018,
-	SHADOWCHASER => 4079
-};
-
-use constant {
 	INACTIVE => 0,
 	ACTIVE => 1
 };
@@ -158,7 +153,7 @@ sub validate_settings {
 	}
 	
 	if ($char && $net && $net->getState() == Network::IN_GAME) {
-		return 0 unless (check_skills_and_class($handle, $on_off));
+		return 0 unless (check_skills($handle, $on_off));
 		return $on_off;
 		
 	} else {
@@ -172,7 +167,7 @@ sub validate_settings {
 }
 
 sub on_in_game {
-	if (check_skills_and_class($config{keepPreserveSkill_handle})) {
+	if (check_skills($config{keepPreserveSkill_handle}, 1)) {
 		changeStatus(ACTIVE);
 	} else {
 		changeStatus(INACTIVE);
@@ -181,16 +176,12 @@ sub on_in_game {
 	undef $in_game_hook;
 }
 
-sub check_skills_and_class {
+sub check_skills {
 	my $handle = shift;
 	my $on_off = shift;
 	
 	my $error = 0;
-	if ($char->{jobID} != STALKER && $char->{jobID} != SHADOWCHASER) {
-		message "[$plugin_name] You're not a stalker/Shadow Chaser\n","system";
-		$error = 1;
-		
-	} elsif (!$char->getSkillLevel(new Skill(handle => 'ST_PRESERVE'))) {
+	if (!$char->getSkillLevel(new Skill(handle => 'ST_PRESERVE'))) {
 		message "[$plugin_name] You don't have the skill Preserve\n","system";
 		$error = 1;
 		
@@ -215,9 +206,6 @@ sub changeStatus {
 	if ($new_status == INACTIVE) {
 		Plugins::delHook($keeping_hooks);
 		debug "[$plugin_name] Plugin stage changed to 'INACTIVE'\n", "$plugin_name", 1;
-		AI::clear('checkShop');
-		undef %recently_checked;
-		undef %in_AI_queue;
 		
 	} elsif ($new_status == ACTIVE) {
 		$keeping_hooks = Plugins::addHooks(
@@ -245,6 +233,13 @@ sub on_RepeatStuff {
 	return if ($char->{muted});
 	return if ($char->{casting});
 	return if ($char->statusActive('EFST_POSTDELAY'));
+	
+	unless (check_skills($config{keepPreserveSkill_handle}, 1)) {
+		message "[$plugin_name] Deactivating plugin due to not having preserve skill or the skill you want to keep.\n","system";
+		configModify('keepPreserveSkill_on', 0);
+		changeStatus(INACTIVE);
+		return;
+	}
 	
 	if ($char->statusActive('EFST_PRESERVE')) {
 		return unless (timeOut($config{keepPreserveSkill_timeout}, $last_preserve_use_time));
