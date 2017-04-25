@@ -1,3 +1,4 @@
+##########################
 # =======================
 # teleToLocation v1.3
 # =======================
@@ -16,8 +17,7 @@
 #      teleToLocation_distance 10         # Distance to the coordinate set in teleToLocation_xy with which the plugin will stop teleporting and decide it reached the destination
 #      teleToLocation_type steps   # Type of distance to be used in teleToLocation_distance, you can use steps or radius, steps will be the distance the character has to walk to get to teleToLocation_xy and radius will be the arithmetic distance to teleToLocation_xy
 #
-#
-# Extras: The plugin will make the character try to teleport if there is a monster on screen and you don't have preserve activated, this can make you keep teleport forever on very mobbed maps like juperus.
+##########################
 package teleToLocation;
 
 use strict;
