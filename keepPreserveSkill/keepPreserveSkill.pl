@@ -202,25 +202,17 @@ sub changeStatus {
 		
 	} elsif ($new_status == ACTIVE) {
 		$keeping_hooks = Plugins::addHooks(
-			['AI_pre',\&on_RepeatStuff, undef],
+			['AI_pre',\&on_AI_pre, undef],
 			['Actor::setStatus::change',\&on_statusChange, undef],
-			['packet/skill_update',\&skills_update, undef],
-			['packet/skills_list',\&skills_update, undef],
-			['packet/skill_add',\&skills_update, undef],
-			['packet/skill_delete',\&skills_update, undef]
+			['packet/skill_update',\&on_skills_update, undef],
+			['packet/skills_list',\&on_skills_update, undef],
+			['packet/skill_add',\&on_skills_update, undef],
+			['packet/skill_delete',\&on_skills_update, undef]
 		);
 		debug "[$plugin_name] Plugin stage changed to 'ACTIVE'\n", "$plugin_name", 1;
 	}
 	
 	$status = $new_status;
-}
-
-sub skills_update {
-	unless (check_skills()) {
-		error "[$plugin_name] You lost the skill you want to keep or the preserve skill. Deactivating plugin.\n.";
-		configModify('keepPreserveSkill_on', 0);
-		changeStatus(INACTIVE);
-	}
 }
 
 ######
@@ -233,7 +225,15 @@ sub on_statusChange {
 	}
 }
 
-sub on_RepeatStuff {
+sub on_skills_update {
+	unless (check_skills()) {
+		error "[$plugin_name] You lost the skill you want to keep or the preserve skill. Deactivating plugin.\n.";
+		configModify('keepPreserveSkill_on', 0);
+		changeStatus(INACTIVE);
+	}
+}
+
+sub on_AI_pre {
 	return if (!$char || !$net || $net->getState() != Network::IN_GAME);
 	return if ($char->{muted});
 	return if ($char->{casting});
