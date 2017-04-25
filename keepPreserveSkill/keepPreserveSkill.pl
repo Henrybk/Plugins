@@ -67,9 +67,11 @@ sub on_unload {
 
 sub on_start3 {
 	$preserve_skill = new Skill(handle => 'ST_PRESERVE');
-    %mobs = %{loadFile(File::Spec->catdir($folder,'mobs_info.json'))};
-	if (!defined %mobs || !%mobs || scalar keys %mobs == 0) {
-		error "[$plugin_name] Could not load mobs info due to a file loading problem.\n.";
+	my $file = File::Spec->catdir($folder,'mobs_info.json');
+    %mobs = %{loadFile($file)};
+	if (!%mobs || scalar keys %mobs == 0) {
+		error "[$plugin_name] Could not load mobs info due to a file loading problem.\n".
+		      "[$plugin_name] File which was not loaded: $file.\n";
 		return;
 	}
 	Log::message( sprintf "[%s] Found %d mobs.\n", $plugin_name, scalar keys %mobs );
@@ -78,10 +80,7 @@ sub on_start3 {
 sub loadFile {
     my $file = shift;
 
-	unless (open FILE, "<:utf8", $file) {
-		error "[$plugin_name] Could not load file $file.\n.";
-		return;
-	}
+	return unless (open FILE, "<:utf8", $file);
 	my @lines = <FILE>;
 	close(FILE);
 	chomp @lines;
@@ -129,8 +128,6 @@ sub validate_settings {
 		$timeoutCritical =  ($key eq 'keepPreserveSkill_timeoutCritical' ?   $val : $config{keepPreserveSkill_timeoutCritical});
 	}
 	
-	$keep_skill = new Skill(handle => $handle);
-	
 	my $error = 0;
 	if (!defined $on_off || !defined $handle || !defined $timeout || !defined $timeoutCritical) {
 		message "[$plugin_name] There are config keys not defined.\n","system";
@@ -155,6 +152,8 @@ sub validate_settings {
 	}
 	
 	return 0 unless ($on_off == 1);
+	
+	$keep_skill = new Skill(handle => $handle);
 	
 	if ($char && $net && $net->getState() == Network::IN_GAME) {
 		unless (check_skills()) {
