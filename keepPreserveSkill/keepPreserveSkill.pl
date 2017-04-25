@@ -48,17 +48,16 @@ my $base_hooks = Plugins::addHooks(
 
 our $folder = $Plugins::current_plugin_folder;
 
-my $last_preserve_use_time;
-
-my $keeping_hooks;
-
-my $in_game_hook = undef;
-
 my $status = INACTIVE;
 
 my $plugin_name = "keepPreserveSkill";
 
 our %mobs;
+my $in_game_hook = undef;
+my $last_preserve_use_time;
+my $keeping_hooks;
+my $keep_skill;
+my $preserve_skill;
 
 sub on_unload {
    Plugins::delHook($base_hooks);
@@ -67,6 +66,7 @@ sub on_unload {
 }
 
 sub on_start3 {
+	$preserve_skill = new Skill(handle => 'ST_PRESERVE');
     %mobs = %{loadFile(File::Spec->catdir($folder,'mobs_info.json'))};
 	if (!defined %mobs || !%mobs || scalar keys %mobs == 0) {
 		error "[$plugin_name] Could not load mobs info due to a file loading problem.\n.";
@@ -129,6 +129,8 @@ sub validate_settings {
 		$timeoutCritical =  ($key eq 'keepPreserveSkill_timeoutCritical' ?   $val : $config{keepPreserveSkill_timeoutCritical});
 	}
 	
+	$keep_skill = new Skill(handle => $handle);
+	
 	my $error = 0;
 	if (!defined $on_off || !defined $handle || !defined $timeout || !defined $timeoutCritical) {
 		message "[$plugin_name] There are config keys not defined, plugin won't be activated.\n","system";
@@ -153,7 +155,7 @@ sub validate_settings {
 	}
 	
 	if ($char && $net && $net->getState() == Network::IN_GAME) {
-		return 0 unless (check_skills($handle, $on_off));
+		return 0 unless (check_skills());
 		return $on_off;
 		
 	} else {
@@ -167,7 +169,7 @@ sub validate_settings {
 }
 
 sub on_in_game {
-	if (check_skills($config{keepPreserveSkill_handle}, 1)) {
+	if (check_skills()) {
 		changeStatus(ACTIVE);
 	} else {
 		changeStatus(INACTIVE);
@@ -177,21 +179,12 @@ sub on_in_game {
 }
 
 sub check_skills {
-	my $handle = shift;
-	my $on_off = shift;
-	
-	my $error = 0;
-	if (!$char->getSkillLevel(new Skill(handle => 'ST_PRESERVE'))) {
+	if (!$char->getSkillLevel($preserve_skill)) {
 		message "[$plugin_name] You don't have the skill Preserve\n","system";
-		$error = 1;
+		return 0;
 		
-	} elsif (!$char->getSkillLevel(new Skill(handle => $handle))) {
-		message "[$plugin_name] You don't have the skill you want to keep: ".$handle."\n","system";
-		$error = 1;
-	}
-	
-	if ($error == 1) {
-		configModify('keepPreserveSkill_on', 0) if ($on_off ne '0');
+	} elsif (!$char->getSkillLevel($keep_skill)) {
+		message "[$plugin_name] You don't have the skill you want to keep: ".$keep_skill->getName."\n","system";
 		return 0;
 	}
 	
@@ -210,12 +203,24 @@ sub changeStatus {
 	} elsif ($new_status == ACTIVE) {
 		$keeping_hooks = Plugins::addHooks(
 			['AI_pre',\&on_RepeatStuff, undef],
-			['Actor::setStatus::change',\&on_statusChange, undef]
+			['Actor::setStatus::change',\&on_statusChange, undef],
+			['packet/skill_update',\&skills_update, undef],
+			['packet/skills_list',\&skills_update, undef],
+			['packet/skill_add',\&skills_update, undef],
+			['packet/skill_delete',\&skills_update, undef]
 		);
 		debug "[$plugin_name] Plugin stage changed to 'ACTIVE'\n", "$plugin_name", 1;
 	}
 	
 	$status = $new_status;
+}
+
+sub skills_update {
+	unless (check_skills()) {
+		error "[$plugin_name] You lost the skill you want to keep or the preserve skill. Deactivating plugin.\n.";
+		configModify('keepPreserveSkill_on', 0);
+		changeStatus(INACTIVE);
+	}
 }
 
 ######
@@ -234,24 +239,19 @@ sub on_RepeatStuff {
 	return if ($char->{casting});
 	return if ($char->statusActive('EFST_POSTDELAY'));
 	
-	unless (check_skills($config{keepPreserveSkill_handle}, 1)) {
-		message "[$plugin_name] Deactivating plugin due to not having preserve skill or the skill you want to keep.\n","system";
-		configModify('keepPreserveSkill_on', 0);
-		changeStatus(INACTIVE);
-		return;
-	}
-	
 	if ($char->statusActive('EFST_PRESERVE')) {
 		return unless (timeOut($config{keepPreserveSkill_timeout}, $last_preserve_use_time));
+		my $timeout_reuse = ($last_preserve_use_time + $config{keepPreserveSkill_timeout} - time);
 		if (AI::isIdle || AI::is(qw(mapRoute follow sitAuto take sitting clientSuspend move route items_take items_gather))) {
-			message "[$plugin_name] Using non-critical preserve with ".(($last_preserve_use_time+600)-time)." seconds left on counter\n","system";
+			message "[$plugin_name] Using non-critical preserve with ".$timeout_reuse." seconds left on counter\n","system";
 			Commands::run("ss 475 1");
 			return;
 		}
 		
 		return unless (timeOut($config{keepPreserveSkill_timeoutCritical}, $last_preserve_use_time));
+		$timeout_reuse = ($last_preserve_use_time + $config{keepPreserveSkill_timeoutCritical} - time);
 		if (AI::is(qw(attack))) {
-			message "[$plugin_name] Using critical preserve with ".(($last_preserve_use_time+600)-time)." seconds left on counter\n","system";
+			message "[$plugin_name] Using critical preserve with ".$timeout_reuse." seconds left on counter\n","system";
 			Commands::run("ss 475 1");
 			return;
 		}
