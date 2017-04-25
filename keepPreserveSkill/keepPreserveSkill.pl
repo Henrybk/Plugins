@@ -1,5 +1,5 @@
 # =======================
-# keepPreserveSkill v0.9.1 beta
+# keepPreserveSkill v0.9.7 beta
 # =======================
 # This plugin is licensed under the GNU GPL
 # Created by Henrybk
@@ -38,7 +38,7 @@ use constant {
 	ACTIVE => 1
 };
 
-Plugins::register('Preserve', 'Preserve', , \&on_unload, \&on_unload);
+Plugins::register('keepPreserveSkill', 'Tries to not get the preserved skill lost', , \&on_unload, \&on_unload);
 
 my $base_hooks = Plugins::addHooks(
 	['start3',        \&on_start3],
