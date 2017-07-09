@@ -1,3 +1,22 @@
+##############################
+# =======================
+# CDaL v3.0
+# =======================
+# This plugin is licensed under the GNU GPL
+# Created by Henrybk from openkorebrasil
+#
+# What it does: It is a plugin that is able to create, delete and change characters during play time.
+#
+# Config keys (put in config.txt):
+#	CDaL_characterToLogin
+#	CDaL_characterToDelete
+#	CDaL_characterToCreate
+#	CDaL_characterToCreateInfo
+#	CDaL_account_email
+#	CDaL_maxTries
+#	CDaL_activateOnStart
+#
+##############################
 package CDaL;
 
 use strict;
@@ -37,6 +56,8 @@ my $chooks = Commands::register(
 my $status = NOT_SET;
 my $tries = 0;
 
+my $plugin_name = 'CDaL';
+
 sub on_unload {
 	Plugins::delHooks($hooks);
 	Commands::unregister($chooks);
@@ -44,16 +65,16 @@ sub on_unload {
 
 sub deletion_successfulHook {
 	if ($status == DELETE) {
-		message "[CDaL] Deletion successful\n", "system";
-		if ($config{createCharacter}) {
+		message "[$plugin_name] Deletion successful\n", "system";
+		if (defined $config{$plugin_name.'_characterToCreate'}) {
 			$status = CREATE;
-			message "[CDaL] Plugin set for creation\n", "system";
-		} elsif ($config{loginCharacter}) {
+			message "[$plugin_name] Plugin set for creation\n", "system";
+		} elsif (defined $config{$plugin_name.'_characterToLogin'}) {
 			$status = LOGIN;
-			message "[CDaL] Plugin set for login\n", "system";
+			message "[$plugin_name] Plugin set for login\n", "system";
 		} else {
 			$status = NOT_SET;
-			message "[CDaL] End of configuration\n", "system";
+			message "[$plugin_name] End of configuration\n", "system";
 		}
 		$tries = 0;
 	}
@@ -62,24 +83,24 @@ sub deletion_successfulHook {
 sub deletion_failedHook {
 	if ($status == DELETE) {
 		$tries++;
-		if ($tries == $config{maxTries}) {
-			message "[CDaL] Deletion failed, deactivating plugin\n", "system";
+		if ($tries == $config{$plugin_name.'_maxTries'}) {
+			message "[$plugin_name] Deletion failed, deactivating plugin\n", "system";
 			$status = NOT_SET;
 		} else {
-			message "[CDaL] Deletion failed, trying again\n", "system";
+			message "[$plugin_name] Deletion failed, trying again\n", "system";
 		}
 	}
 }
 
 sub creation_successfulHook {
 	if ($status == CREATE) {
-		message "[CDaL] Creation successful\n", "system";
-		if ($config{loginCharacter}) {
+		message "[$plugin_name] Creation successful\n", "system";
+		if (defined $config{$plugin_name.'_characterToLogin'}) {
 			$status = LOGIN;
-			message "[CDaL] Plugin set for login\n", "system";
+			message "[$plugin_name] Plugin set for login\n", "system";
 		} else {
 			$status = NOT_SET;
-			message "[CDaL] End of configuration\n", "system";
+			message "[$plugin_name] End of configuration\n", "system";
 		}
 		$tries = 0;
 	}
@@ -88,19 +109,19 @@ sub creation_successfulHook {
 sub creation_failedHook {
 	if ($status == CREATE) {
 		$tries++;
-		if ($tries == $config{maxTries}) {
-			message "[CDaL] Creation failed, deactivating plugin\n", "system";
+		if ($tries == $config{$plugin_name.'_maxTries'}) {
+			message "[$plugin_name] Creation failed, deactivating plugin\n", "system";
 			$status = NOT_SET;
 		} else {
-			message "[CDaL] Creation failed, trying again\n", "system";
+			message "[$plugin_name] Creation failed, trying again\n", "system";
 		}
 	}
 }
 
 sub login_successfulHook {
 	if ($status == LOGIN) {
-		message "[CDaL] Login successful\n", "system";
-		message "[CDaL] End of configuration\n", "system";
+		message "[$plugin_name] Login successful\n", "system";
+		message "[$plugin_name] End of configuration\n", "system";
 		$status = NOT_SET;
 		$tries = 0;
 	}
@@ -108,79 +129,84 @@ sub login_successfulHook {
 
 sub charSelectScreenHook {
     my ($self, $args) = @_;
-	message "[CDaL] we are at the character selection screen\n", "system";
-	if ($status == START || ($config{activateOnStart} && $status == NOT_SET)) {
-		if ($config{activateOnStart}) {
-			configModify("activateOnStart", 0);
-			message "[CDaL] Plugin set to activate on Startup\n", "system";
+	message "[$plugin_name] we are at the character selection screen\n", "system";
+	if ($status == START || ($config{$plugin_name.'_activateOnStart'} && $status == NOT_SET)) {
+		if ($config{$plugin_name.'_activateOnStart'}) {
+			configModify($plugin_name.'_activateOnStart', 0);
+			message "[$plugin_name] Plugin set to activate on Startup\n", "system";
 			return unless (checkConfig());
-			message "[CDaL] Configuration accepted\n", "system";
+			message "[$plugin_name] Configuration accepted\n", "system";
 			print_actions();
 		}
-		if ($config{deleteCharacter}) {
-			message "[CDaL] Plugin set for deletion\n", "system";
+		if (defined $config{$plugin_name.'_characterToDelete'}) {
+			message "[$plugin_name] Plugin set for deletion\n", "system";
 			$status = DELETE;
-		} elsif ($config{createCharacter}) {
-			message "[CDaL] Plugin set for creation\n", "system";
+		} elsif (defined $config{$plugin_name.'_characterToCreate'}) {
+			message "[$plugin_name] Plugin set for creation\n", "system";
 			$status = CREATE;
 		} else {
-			message "[CDaL] Plugin set for login\n", "system";
+			message "[$plugin_name] Plugin set for login\n", "system";
 			$status = LOGIN;
 		}
 	}
 	
 	return if ($status == NOT_SET);
 	
-	message "[CDaL] Plugin is active\n", "system";
+	message "[$plugin_name] Plugin is active\n", "system";
 	
     if ($status == DELETE) {
-        message "[CDaL] Deleting ".$config{characterToDelete}.": ".$chars[$config{characterToDelete}]{name}.", ".$config{account_email}."\n", "system";
+        message "[$plugin_name] Deleting ".$config{$plugin_name.'_characterToDelete'}.": ".$chars[$config{$plugin_name.'_characterToDelete'}]{name}.", ".$config{$plugin_name.'_account_email'}."\n", "system";
         $messageSender->sendBanCheck($charID);
-        $messageSender->sendCharDelete($chars[$config{characterToDelete}]{charID}, $config{account_email});
+        $messageSender->sendCharDelete($chars[$config{$plugin_name.'_characterToDelete'}]{charID}, $config{$plugin_name.'_account_email'});
         $timeout{'charlogin'}{'time'} = time;
         $args->{return} = RETURN_CREATEDELETE;
         
     } elsif ($status == CREATE) {
 		my $newCharName = generateName();
-        message "[CDaL] Creating ".$config{characterToCreate}.": $newCharName\n", "system";
-		my ($str, $agi, $vit, $int, $dex, $luk, $hair_style, $hair_color) = $config{characterToCreateInfo} =~ /^([1-9])\s([1-9])\s([1-9])\s([1-9])\s([1-9])\s([1-9])\s([1-9])\s([1-9])$/;
+        message "[$plugin_name] Creating ".$config{$plugin_name.'_characterToCreate'}.": $newCharName\n", "system";
+
+		my @args = split(/\s+/, parseArgs($config{$plugin_name.'_characterToCreateInfo'}));
 		
-        $messageSender->sendCharCreate($config{characterToCreate}, $newCharName, $str, $agi, $vit, $int, $dex, $luk, $hair_style, $hair_color);
+		unless (createCharacter($config{$plugin_name.'_characterToCreate'}, $newCharName, @args)) {
+			message "[$plugin_name] Invalid char creation config setting, please fix CDaL_characterToCreateInfo in config.txt\n", "system";
+			$status = NOT_SET;
+			return;
+		}
 		
         $timeout{'charlogin'}{'time'} = time;
         $args->{return} = RETURN_CREATEDELETE;
         
     } elsif ($status == LOGIN) {
 		$tries++;
-		if ($tries == $config{maxTries}) {
-			message "[CDaL] Too many login tries, deactivating plugin\n", "system";
+		if ($tries == $config{$plugin_name.'_maxTries'}) {
+			message "[$plugin_name] Too many login tries, deactivating plugin\n", "system";
 			$status = NOT_SET;
 		}
-		message "[CDaL] Login ".$config{characterToLogin}.": ".$chars[$config{characterToLogin}]{name}."\n", "system";
-        $messageSender->sendCharLogin($config{characterToLogin});
+		message "[$plugin_name] Login ".$config{$plugin_name.'_characterToLogin'}.": ".$chars[$config{$plugin_name.'_characterToLogin'}]{name}."\n", "system";
+        $messageSender->sendCharLogin($config{$plugin_name.'_characterToLogin'});
         $timeout{'charlogin'}{'time'} = time;
         $args->{return} = RETURN_LOGIN;
-        configModify("char", $config{characterToLogin});
+        configModify("char", $config{$plugin_name.'_characterToLogin'});
     }
 }
 
 sub print_actions {
-	message "[CDaL] Actions to be performed: .\n", "system";
+	message "[$plugin_name] Actions to be performed: .\n", "system";
 	my $counter = 1;
-	if ($config{deleteCharacter}) {
-		message $counter++." - Character in slot ".$config{characterToDelete}." will be deleted.\n", "system";
+	if (defined $config{$plugin_name.'_characterToDelete'}) {
+		message $counter++." - Character in slot ".$config{$plugin_name.'_characterToDelete'}." will be deleted.\n", "system";
 	}
-	if ($config{createCharacter}) {
-		message  $counter++." - Character will be created in slot ".$config{characterToCreate}.".\n", "system";
+	if (defined $config{$plugin_name.'_characterToCreate'}) {
+		message  $counter++." - Character will be created in slot ".$config{$plugin_name.'_characterToCreate'}.".\n", "system";
 	}
-	if ($config{loginCharacter}) {
-		message  $counter++." - Character in slot ".$config{characterToLogin}." will used to log in game.\n", "system";
+	if (defined $config{$plugin_name.'_characterToLogin'}) {
+		message  $counter++." - Character in slot ".$config{$plugin_name.'_characterToLogin'}." will used to log in game.\n", "system";
 	}
 }
 
 sub pluginCommand {
 	if (checkConfig()) {
-		message "[CDaL] Configuration accepted.\n", "system";
+		message "[$plugin_name] Configuration accepted.\n", "system";
 		print_actions();
 		$status = START;
 		$messageSender->sendQuitToCharSelect();
@@ -188,47 +214,44 @@ sub pluginCommand {
 }
 
 sub checkConfig {
-	if (!$config{deleteCharacter} && !$config{createCharacter} && !$config{loginCharacter}) {
-		error "[CDaL] Config isn't set for creation, deletion or login.\n";
+	if (!defined $config{$plugin_name.'_characterToDelete'} && !defined $config{$plugin_name.'_characterToCreate'} && !defined $config{$plugin_name.'_characterToLogin'}) {
+		error "[$plugin_name] Config isn't set for creation, deletion or login.\n";
 		
-	} elsif ($config{deleteCharacter} && !defined $config{account_email}) {
-		error "[CDaL] Set to delete character but not email set.\n";
+	} elsif (defined $config{$plugin_name.'_characterToDelete'} && !defined $config{$plugin_name.'_account_email'}) {
+		error "[$plugin_name] Set to delete character but not email set.\n";
 		
-	} elsif ($config{deleteCharacter} && !defined $config{characterToDelete}) {
-		error "[CDaL] Set to delete character but not set which one.\n";
+	} elsif (defined $config{$plugin_name.'_characterToDelete'} && !defined $chars[$config{$plugin_name.'_characterToDelete'}]) {
+		error "[$plugin_name] Set to delete character but there is no character in the provided slot.\n";
 		
-	} elsif ($config{deleteCharacter} && !defined $chars[$config{characterToDelete}]) {
-		error "[CDaL] Set to delete character but there is no character in the provided slot.\n";
+	} elsif (defined $config{$plugin_name.'_characterToCreate'} && !defined $config{$plugin_name.'_characterToCreateInfo'}) {
+		error "[$plugin_name] Set to create character but not set it's info (stats, hair and hair color, sex, race, etc).\n";
 		
-	} elsif ($config{createCharacter} && !defined $config{characterToCreate}) {
-		error "[CDaL] Set to create character but there not set in which slot.\n";
+	} elsif (defined $config{$plugin_name.'_characterToCreate'} && $config{$plugin_name.'_characterToCreate'} !~ /\d+/) {
+		error "[$plugin_name] Set to create character but value is invalid ($config{$plugin_name.'_characterToCreate'}), must be a number.\n";
 		
-	} elsif ($config{createCharacter} && !defined $config{characterToCreateInfo}) {
-		error "[CDaL] Set to create character but not set it's info (stats, hair and hair color).\n";
+	} elsif (defined $config{$plugin_name.'_characterToLogin'} && $config{$plugin_name.'_characterToLogin'} !~ /\d+/) {
+		error "[$plugin_name] Set to login on character but value is invalid ($config{$plugin_name.'_characterToLogin'}), must be a number.\n";
 		
-	} elsif ($config{createCharacter} && $config{characterToCreateInfo} !~ /^([1-9])\s([1-9])\s([1-9])\s([1-9])\s([1-9])\s([1-9])\s([1-9])\s([1-9])$/) {
-		error "[CDaL] Set to create character but info (stats, hair and hair color) set wrongly.\n";
+	} elsif (defined $config{$plugin_name.'_characterToDelete'} && $config{$plugin_name.'_characterToDelete'} !~ /\d+/) {
+		error "[$plugin_name] Set to delete character but value is invalid ($config{$plugin_name.'_characterToDelete'}), must be a number.\n";
 		
-	} elsif ($config{createCharacter} && defined $chars[$config{characterToCreate}] && !$config{deleteCharacter}) {
-		error "[CDaL] Set to create a character in full slot, and no character will be deleted.\n";
+	} elsif (defined $config{$plugin_name.'_characterToCreate'} && defined $chars[$config{$plugin_name.'_characterToCreate'}] && !defined $config{$plugin_name.'_characterToDelete'}) {
+		error "[$plugin_name] Set to create a character in full slot, and no character will be deleted.\n";
 		
-	} elsif ($config{createCharacter} && defined $chars[$config{characterToCreate}] && $config{deleteCharacter} && $config{characterToCreate} != $config{characterToDelete}) {
-		error "[CDaL] Set to create a character in full slot, and the character that will be deleted isn't in the same slot.\n";
+	} elsif (defined $config{$plugin_name.'_characterToCreate'} && defined $chars[$config{$plugin_name.'_characterToCreate'}] && defined $config{$plugin_name.'_characterToDelete'} && $config{$plugin_name.'_characterToCreate'} != $config{$plugin_name.'_characterToDelete'}) {
+		error "[$plugin_name] Set to create a character in full slot, and the character that will be deleted isn't in the same slot.\n";
 		
-	} elsif ($config{loginCharacter} && !defined $config{characterToLogin}) {
-		error "[CDaL] Set to login on character but not set in which slot.\n";
+	} elsif (defined $config{$plugin_name.'_characterToLogin'} && !$chars[$config{$plugin_name.'_characterToLogin'}] && !defined $config{$plugin_name.'_characterToCreate'}) {
+		error "[$plugin_name] Set to login on empty slot and no character will be created.\n";
 		
-	} elsif ($config{loginCharacter} && !$chars[$config{characterToLogin}] && !$config{createCharacter}) {
-		error "[CDaL] Set to login on empty slot and no character will be created.\n";
+	} elsif (defined $config{$plugin_name.'_characterToLogin'} && !$chars[$config{$plugin_name.'_characterToLogin'}] && defined $config{$plugin_name.'_characterToCreate'} && $config{$plugin_name.'_characterToCreate'} != $config{$plugin_name.'_characterToLogin'}) {
+		error "[$plugin_name] Set to login on empty slot and the created character will on another slot.\n";
 		
-	} elsif ($config{loginCharacter} && !$chars[$config{characterToLogin}] && $config{createCharacter} && $config{characterToCreate} != $config{characterToLogin}) {
-		error "[CDaL] Set to login on empty slot and the created character will on another slot.\n";
+	} elsif (defined $config{$plugin_name.'_characterToLogin'} && $chars[$config{$plugin_name.'_characterToLogin'}] && defined $config{$plugin_name.'_characterToDelete'} && $config{$plugin_name.'_characterToDelete'} == $config{$plugin_name.'_characterToLogin'} && !defined $config{$plugin_name.'_characterToCreate'}) {
+		error "[$plugin_name] Set to login on a full slot but the same slot will be deleted, and no character will be created.\n";
 		
-	} elsif ($config{loginCharacter} && $chars[$config{characterToLogin}] && $config{deleteCharacter} && $config{characterToDelete} == $config{characterToLogin} && !$config{createCharacter}) {
-		error "[CDaL] Set to login on a full slot but the same slot will be deleted, and no character will be created.\n";
-		
-	} elsif ($config{loginCharacter} && $chars[$config{characterToLogin}] && $config{deleteCharacter} && $config{characterToDelete} == $config{characterToLogin} && $config{createCharacter} && $config{characterToCreate} != $config{characterToLogin}) {
-		error "[CDaL] Set to login on a full slot but the same slot will be deleted, and the created character will be on another slot.\n";
+	} elsif (defined $config{$plugin_name.'_characterToLogin'} && $chars[$config{$plugin_name.'_characterToLogin'}] && defined $config{$plugin_name.'_characterToDelete'} && $config{$plugin_name.'_characterToDelete'} == $config{$plugin_name.'_characterToLogin'} && defined $config{$plugin_name.'_characterToCreate'} && $config{$plugin_name.'_characterToCreate'} != $config{$plugin_name.'_characterToLogin'}) {
+		error "[$plugin_name] Set to login on a full slot but the same slot will be deleted, and the created character will be on another slot.\n";
 		
 	} else {
 		return 1;

@@ -45,7 +45,7 @@ sub on_configModify {
 sub on_start3 {
 	$betterWalk_file = (defined $config{betterWalk_file})? $config{betterWalk_file} : "betterwalk.txt";
 	Settings::removeFile($cfID) if ($cfID);
-	$cfID = Settings::addControlFile($betterWalk_file, loader => [ \&parseWalkPlan]);
+	$cfID = Settings::addControlFile($betterWalk_file, loader => [ \&parseWalkPlan], mustExist => 0);
 	Settings::loadByHandle($cfID);
 }
 
