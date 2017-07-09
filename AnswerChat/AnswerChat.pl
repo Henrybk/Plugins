@@ -24,6 +24,16 @@
 #
 # ------------------
 # Plugin by Henry from Openkore Brasil
+#
+# Example (put in config.txt):
+#	
+#	Config example:
+#      AnswerChat_Pm 1
+#      AnswerChat_Pub 1
+#      AnswerChat_PubMax 1
+#      AnswerChat_file AnswerChat.txt
+#      AnswerChat_Error 1
+#      AnswerChat_ErrorChance 5
 #################################################################################
 package AnswerChat;
 
@@ -131,12 +141,11 @@ sub on_PM {
 
 sub on_Pub {
 	return 0 unless ($config{$plugin_name.'_Pub'});
-	if (!$field->isCity() && @{$playersList->getItems()} < $config{$plugin_name.'_PubMax'}) {
-		my ($Type, $Args) = @_;
-		my $player = $Args->{'MsgUser'};
-		my $recievedMessage = $Args->{'Msg'};
-		Main($recievedMessage,$player, "c");
-	}
+	return 0 unless (!$field->isCity() && @{$playersList->getItems()} <= $config{$plugin_name.'_PubMax'});
+	my ($Type, $Args) = @_;
+	my $player = $Args->{'MsgUser'};
+	my $recievedMessage = $Args->{'Msg'};
+	Main($recievedMessage,$player, "c");
 }
 
 sub Main {
@@ -145,10 +154,10 @@ sub Main {
 	#Clean Message
 	##########
 	$recievedMessage = lc($recievedMessage);
-	$recievedMessage =~ s/\n//g; # remove newlines
-	$recievedMessage =~ s/\r//g; # remove cariage returns;
-	$recievedMessage =~ s/^_*//; #remove leading underscores
-	$recievedMessage =~ s/_*$//; #remove trailing underscores
+	$recievedMessage =~ s/\n//g;  # remove newlines
+	$recievedMessage =~ s/\r//g;  # remove cariage returns;
+	$recievedMessage =~ s/^_*//;  #remove leading underscores
+	$recievedMessage =~ s/_*$//;  #remove trailing underscores
 	$recievedMessage =~ s/^\s*//; #remove leading spaces
 	$recievedMessage =~ s/\s*$//; #remove trailing spaces
 	#$recievedMessage =~ s/[^0-9a-z]*$//;
