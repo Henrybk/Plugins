@@ -1,10 +1,34 @@
-package shopper;
-
-#
+##############################
+# =======================
+# BetterShopper v1.0
+# =======================
 # This plugin is licensed under the GNU GPL
-# Copyright 2006 by kaliwanagan
-# --------------------------------------------------
+# Created by Henrybk from openkorebrasil
+# Based on the shopper plugin made by kaliwanagan on 2006 which was also licensed under the GNU GPL
 #
+# What it does: It is a plugin that is able to create, delete and change characters during play time.
+#
+# Config keys (put in config.txt):
+#	BetterShopper_on 1/0  # Activates the plugin
+#
+#
+# Config blocks: (used to buy items)
+###############################################
+#
+# BetterShopper = Name of the item you want to buy.
+# maxPrice = Maximum price of the item you want to buy.
+# maxAmount = Amount of the item that you want to buy.
+# disabled = Disables the blocks (this is set by default after a successful buying session)
+#
+# Example:
+###############################################
+#  BetterShopper Bow [4] {
+#      maxPrice 1000
+#      maxAmount 1
+#      disabled 0
+#  }
+###############################################
+package BetterShopper;
 
 use strict;
 use Plugins;
@@ -17,12 +41,14 @@ use Network::Send;
 use POSIX;
 use I18N qw(bytesToString stringToBytes);
 
-Plugins::register('shopper', 'automatically buy items from merchant vendors', \&Unload);
+Plugins::register('BetterShopper', 'automatically buy items from merchant vendors', \&Unload);
 
 my $base_hooks = Plugins::addHooks(
 	['postloadfiles', \&checkConfig],
 	['configModify',  \&on_configModify]
 );
+
+my $plugin_name = 'BetterShopper';
 
 use constant {
 	INACTIVE => 0,
@@ -35,7 +61,7 @@ my $time = time;
 my %recently_checked;
 my %in_AI_queue;
 
-my $recheck_timeout = 300;
+my $recheck_timeout = 60;
 
 my $shopping_hooks;
 
@@ -44,28 +70,28 @@ my $status = INACTIVE;
 sub Unload {
 	Plugins::delHook($base_hooks);
 	changeStatus(INACTIVE);
-	message "[shopper] Plugin unloading or reloading.\n", 'success';
+	message "[$plugin_name] Plugin unloading or reloading.\n", 'success';
 }
 
 sub checkConfig {
-	if (exists $config{shopper_on} && $config{shopper_on} == 1) {
-		message "[shopper] Config set to 'on' shopper will be active.\n", 'success';
+	if (exists $config{$plugin_name.'_on'} && $config{$plugin_name.'_on'} == 1) {
+		message "[$plugin_name] Config set to 'on' shopper will be active.\n", 'success';
 		return changeStatus(ACTIVE);
 	} else {
-		message "[shopper] Config set to 'off' shopper will be inactive.\n", 'success';
+		message "[$plugin_name] Config set to 'off' shopper will be inactive.\n", 'success';
 		return changeStatus(INACTIVE);
 	}
 }
 
 sub on_configModify {
 	my (undef, $args) = @_;
-	return unless ($args->{key} eq 'shopper_on');
-	return if ($args->{val} eq $config{shopper_on});
+	return unless ($args->{key} eq ($plugin_name.'_on'));
+	return if ($args->{val} eq $config{$plugin_name.'_on'});
 	if ($args->{val} == 1) {
-		message "[shopper] Config set to 'on' shopper will be active.\n", 'success';
+		message "[$plugin_name] Config set to 'on' shopper will be active.\n", 'success';
 		return changeStatus(ACTIVE);
 	} else {
-		message "[shopper] Config set to 'on' shopper will be active.\n", 'success';
+		message "[$plugin_name] Config set to 'on' shopper will be active.\n", 'success';
 		return changeStatus(INACTIVE);
 	}
 }
@@ -77,7 +103,7 @@ sub changeStatus {
 	
 	if ($new_status == INACTIVE) {
 		Plugins::delHook($shopping_hooks);
-		debug "[shopper] Plugin stage changed to 'INACTIVE'\n", "shopper", 1;
+		debug "[$plugin_name] Plugin stage changed to 'INACTIVE'\n", "shopper", 1;
 		AI::clear('checkShop');
 		undef %recently_checked;
 		undef %in_AI_queue;
@@ -90,14 +116,14 @@ sub changeStatus {
 			['packet_mapChange', \&mapchange],
 			['player_disappeared', \&player_disappeared]
 		);
-		debug "[shopper] Plugin stage changed to 'ACTIVE'\n", "shopper", 1;
+		debug "[$plugin_name] Plugin stage changed to 'ACTIVE'\n", "shopper", 1;
 		
 		foreach my $vender_index (0..$#venderListsID) {
 			my $venderID = $venderListsID[$vender_index];
 			next unless (defined $venderID);
 			my $vender = $venderLists{$venderID};
 			
-			debug "[shopper] Adding shop '".$vender->{'title'}."' of player '".get_player_name($venderID)."' to AI queue check list.\n", "shopper", 1;
+			debug "[$plugin_name] Adding shop '".$vender->{'title'}."' of player '".get_player_name($venderID)."' to AI queue check list.\n", "shopper", 1;
 			AI::queue('checkShop', {vendorID => $venderID});
 		}
 	}
@@ -107,7 +133,7 @@ sub changeStatus {
 
 sub mapchange {
 	if (AI::inQueue('checkShop')) {
-		debug "[shopper] Clearing all 'checkShop' instances from AI queue because of a mapchange.\n", "shopper", 1;
+		debug "[$plugin_name] Clearing all 'checkShop' instances from AI queue because of a mapchange.\n", "shopper", 1;
 		AI::clear('checkShop');
 	}
 }
@@ -124,7 +150,7 @@ sub AI_pre {
 		my $vendorID = AI::args->{vendorID};
 		my $vender = $venderLists{$vendorID};
 		if (defined $vender && grep { $vendorID eq $_ } @venderListsID) {
-			debug "[shopper] Openning shop '".$vender->{'title'}."' of player ".get_player_name($vendorID).".\n", "shopper", 1;
+			debug "[$plugin_name] Openning shop '".$vender->{'title'}."' of player ".get_player_name($vendorID).".\n", "shopper", 1;
 			$messageSender->sendEnteringVender($vendorID);
 		}
 		delete $in_AI_queue{$vendorID};
@@ -142,7 +168,7 @@ sub encounter {
 	if (!exists $in_AI_queue{$ID}) {
 		if ( !exists $recently_checked{$ID} || ( exists $recently_checked{$ID} && main::timeOut($recently_checked{$ID}, $recheck_timeout) ) ) {
 			$in_AI_queue{$ID} = 1;
-			debug "[shopper] Adding shop '".$title."' of player ".get_player_name($ID)." to AI queue check list.\n", "shopper", 1;
+			debug "[$plugin_name] Adding shop '".$title."' of player ".get_player_name($ID)." to AI queue check list.\n", "shopper", 1;
 			AI::queue('checkShop', {vendorID => $ID});
 		}
 	}
@@ -157,7 +183,7 @@ sub lost {
 			my $seq_args = @AI::ai_seq_args[$seq_index];
 			next unless ($seq eq 'checkShop');
 			next unless ($seq_args->{vendorID} eq $ID);
-			debug "[shopper] Removing player ".get_player_name($ID)." from AI queue check list because shop disappeared.\n", "shopper", 1;
+			debug "[$plugin_name] Removing player ".get_player_name($ID)." from AI queue check list because shop disappeared.\n", "shopper", 1;
 			splice(@AI::ai_seq, $seq_index, 1);
 			splice(@AI::ai_seq_args, $seq_index, 1);
 			last;
@@ -175,7 +201,7 @@ sub player_disappeared {
 			my $seq_args = @AI::ai_seq_args[$seq_index];
 			next unless ($seq eq 'checkShop');
 			next unless ($seq_args->{vendorID} eq $ID);
-			debug "[shopper] Removing player ".get_player_name($ID)." from AI queue check list because player disappeared.\n", "shopper", 1;
+			debug "[$plugin_name] Removing player ".get_player_name($ID)." from AI queue check list because player disappeared.\n", "shopper", 1;
 			splice(@AI::ai_seq, $seq_index, 1);
 			splice(@AI::ai_seq_args, $seq_index, 1);
 			last;
@@ -194,7 +220,7 @@ sub storeList {
 	
 	$recently_checked{$venderID} = time;
 
-	my $prefix = "shopper_";
+	my $prefix = $plugin_name.'_';
 	my $i = 0;
 	while (exists $config{$prefix.$i}) {
 		my $maxPrice = $config{$prefix.$i."_maxPrice"};
