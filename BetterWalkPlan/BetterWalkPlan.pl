@@ -7,35 +7,62 @@ use Misc;
 use AI;
 use Log qw(debug message warning error);
 use Translation;
+use File::Spec;
 
 my $planStep = 0;
-my $cfID;
+my $file_handle;
 my $betterWalk_file;
 my $reverse = 0;
 my %walkMaps;
 
 Plugins::register('BetterWalkPlan', 'Revised waypoint/planwalk 3.0', \&on_unload, \&on_unload);
 
-my $hooks = Plugins::addHooks(
-	['configModify', \&on_configModify, undef],
-	['start3', \&on_start3, undef]
+my $start_hooks = Plugins::addHooks(
+	['start3',                    \&on_start3, undef]
 );
+
+my $config_hooks;
 
 my $chooks = Commands::register(
 	['planwalk', "BetterWalkPlan", \&commandHandler]
 );
 
 sub on_unload {
-	Plugins::delHooks($hooks);
+	Plugins::delHooks($start_hooks);
+	Plugins::delHooks($config_hooks);
+	Commands::unregister($chooks);
+	Settings::removeFile($file_handle) if (defined $file_handle);
+	undef $file_handle;
+	undef $betterWalk_file;
+}
+
+sub checkConfig {
+	if (defined $config{betterWalk_file} && $config{betterWalk_file} ne $betterWalk_file) {
+		$betterWalk_file = $config{betterWalk_file};
+		Settings::removeFile($file_handle);
+		$file_handle = Settings::addControlFile($betterWalk_file, loader => [ \&parseWalkPlan, undef], mustExist => 0);
+		Settings::loadByHandle($file_handle);
+		$planStep = 0;
+		return;
+		
+	} elsif (!defined $config{betterWalk_file} && $betterWalk_file ne "betterwalk.txt") {
+		$betterWalk_file = "betterwalk.txt";
+		Settings::removeFile($file_handle);
+		$file_handle = Settings::addControlFile($betterWalk_file, loader => [ \&parseWalkPlan, undef], mustExist => 0);
+		Settings::loadByHandle($file_handle);
+		$planStep = 0;
+		return;
+		
+	}
 }
 
 sub on_configModify {
 	my (undef, $args) = @_;
 	if ($args->{key} eq 'betterWalk_file') {
 		$betterWalk_file = $args->{val};
-		Settings::removeFile($cfID);
-		$cfID = Settings::addControlFile($betterWalk_file, loader => [ \&parseWalkPlan, undef]);
-		Settings::loadByHandle($cfID);
+		Settings::removeFile($file_handle);
+		$file_handle = Settings::addControlFile($betterWalk_file, loader => [ \&parseWalkPlan, undef], mustExist => 0);
+		Settings::loadByHandle($file_handle);
 		$planStep = 0;
 	} elsif ($args->{key} eq 'betterWalkPlan' && $args->{val} == 0) {
 		$planStep = 0;
@@ -43,10 +70,18 @@ sub on_configModify {
 }
 
 sub on_start3 {
-	$betterWalk_file = (defined $config{betterWalk_file})? $config{betterWalk_file} : "betterwalk.txt";
-	Settings::removeFile($cfID) if ($cfID);
-	$cfID = Settings::addControlFile($betterWalk_file, loader => [ \&parseWalkPlan], mustExist => 0);
-	Settings::loadByHandle($cfID);
+	if (!defined $config{betterWalk_file}) {
+		$config{betterWalk_file} = "betterwalk.txt";
+		$betterWalk_file = "betterwalk.txt";
+	} else {
+		$betterWalk_file = $config{betterWalk_file};
+	}
+	$file_handle = Settings::addControlFile($betterWalk_file, loader => [ \&parseWalkPlan, undef], mustExist => 0);
+	Settings::loadByHandle($file_handle);
+	$config_hooks = Plugins::addHooks(
+		['configModify',              \&on_configModify, undef],
+		['postloadfiles',             \&checkConfig],
+	);
 }
 
 sub parseWalkPlan {
@@ -108,11 +143,14 @@ sub parseWalkPlan {
 	}
 }
 
+# The correct way to do this should be by a hook and $args->{return}
 *AI::CoreLogic::processRandomWalk = sub {
 	if (AI::isIdle && (AI::SlaveManager::isIdle()) && $config{route_randomWalk} && !$ai_v{sitAuto_forcedBySitCommand}
 		&& (!$field->isCity || $config{route_randomWalk_inTown})
 		&& length($field->{rawMap}) 
 		){
+		
+		# Plugin version
 		if ($config{betterWalkPlan} && exists($walkMaps{$field->baseName}) && timeOut($walkMaps{$field->baseName}{timeout}, $walkMaps{$field->baseName}{time})) {
 			if ($config{'lockMap_x'} || $config{'lockMap_randX'} || $config{'lockMap_y'} || $config{'lockMap_randY'}) {
 				error T("betterWalkPlan doesn't work with coordinate lockmap; BetterWalkPlan disabled\n");
@@ -168,6 +206,8 @@ sub parseWalkPlan {
 					if ($reverse == 0) { $planStep++; } else { $planStep--; };
 				}
 			}
+		
+		# Normal randomwalk
 		} else {
 			if($char->{pos}{x} == $config{'lockMap_x'} && !($config{'lockMap_randX'} > 0) && ($char->{pos}{y} == $config{'lockMap_y'} && !($config{'lockMap_randY'} >0))) {
 				error T("Coordinate lockmap is used; randomWalk disabled\n");
@@ -217,31 +257,31 @@ sub commandHandler {
 		if (@params != 3) {
 			error "[PlanWalk] Syntax Error in function conf. Not found <map>\n".
 				"Usage: planwalk conf <map> [<steps|timeout|reverseend>] [<value>]\n";
-		} else {
-			if (!exists($walkMaps{$params[0]})) {
-				error "[PlanWalk] Given map for conf not found <map>\n";
-			} else {
-				if ($params[1] eq 'timeout' && $params[2] !~ /\d+/) {
-					error "[PlanWalk] Invalid value for Timeout\n";
-					return;
-				} elsif ($params[1] eq 'reverseend' && $params[2] !~ /(0|1)/) {
-					error "[PlanWalk] Invalid value for ReverseEnd\n";
-					return;
-				} elsif ($params[1] eq 'steps') {
-					my @newsteps = split(/-/,$params[2]);
-					foreach my $newstep (@newsteps) {
-						unless ($newstep =~ /^(\d+)(\[(\d+)\])?:(\d+)(\[(\d+)\])?$/) {
-							error "[PlanWalk] Invalid value for steps\n";
-							return;
-						}
-					}
-				} elsif ($params[1] ne 'steps' && $params[1] ne 'reverseend' && $params[1] ne 'timeout') {
-					error "[PlanWalk] Invalid key for conf\n"; 
+			return;
+			
+		} elsif ($params[1] ne 'steps' && $params[1] ne 'reverseend' && $params[1] ne 'timeout') {
+			error "[PlanWalk] Invalid key for conf\n"; 
+			return;
+			
+		} elsif ($params[1] eq 'timeout' && $params[2] !~ /\d+/) {
+			error "[PlanWalk] Invalid value for Timeout\n";
+			return;
+			
+		} elsif ($params[1] eq 'reverseend' && $params[2] !~ /(0|1)/) {
+			error "[PlanWalk] Invalid value for ReverseEnd\n";
+			return;
+			
+		} elsif ($params[1] eq 'steps') {
+			my @newsteps = split(/-/,$params[2]);
+			foreach my $newstep (@newsteps) {
+				unless ($newstep =~ /^(\d+)(\[(\d+)\])?:(\d+)(\[(\d+)\])?$/) {
+					error "[PlanWalk] Invalid value for steps\n";
 					return;
 				}
-				&FileWrite($params[0], $params[1], $params[2]);
 			}
 		}
+		
+		&FileWrite($params[0], $params[1], $params[2]);
 	### parameter: probably a plan
 	} else {
 		if (!exists($walkMaps{$arg})) {
@@ -249,7 +289,7 @@ sub commandHandler {
 		} else {
 			message ("[PlanWalk] Plan for $arg.\n","info");
 			for (my $o = 0; $o < @{$walkMaps{$arg}{X}}; $o++) {
-			message ("$o - @{$walkMaps{$arg}{X}}[$o]+-@{$walkMaps{$arg}{randX}}[$o] @{$walkMaps{$arg}{Y}}[$o]+-@{$walkMaps{$arg}{randY}}[$o].\n","info");
+				message ("$o - @{$walkMaps{$arg}{X}}[$o]+-@{$walkMaps{$arg}{randX}}[$o] @{$walkMaps{$arg}{Y}}[$o]+-@{$walkMaps{$arg}{randY}}[$o].\n","info");
 			}
 		}
 	}
@@ -257,38 +297,41 @@ sub commandHandler {
 
 sub FileWrite {
 	my ($map, $key, $value) = @_;
-	my ($Found, $StepsIndex, $StartStepIndex, $EndStepIndex);
-	my $spaces;#just to keep things organized
+	my $Found = 0;
+	my $line_index = 0;
+	my $spaces;
 	my $controlfile = Settings::getControlFilename($betterWalk_file);
+	if (!defined $controlfile) {
+		$controlfile = File::Spec->catdir($Settings::controlFolders[0],$betterWalk_file);
+	}
 	open(FILE, "<:utf8", $controlfile);
 	my @lines = <FILE>;
 	close(FILE);
 	chomp @lines;
+	my @clean_lines;
+	
 	foreach my $line (@lines) {
-		message "Line: $line\n";
 		if ($Found) {
 			if ($line =~ /}/) {
-				if ($key eq 'steps') {
-					if ($spaces) {
-						$value =~ s/-/\n$spaces/ig;
-						$line =~ s/}/$spaces$value\n}/i;
-					} else {
-						$value =~ s/-/\n/ig;
-						$line =~ s/}/$value\n}/i;
-					}
-					$EndStepIndex = $StepsIndex;
+				if ($key ne 'steps') {
+					$line =~ s/}/\t$key $value\n}/i;
 				} else {
-					$line =~ s/}/$key $value\n}/i;
+					my @newsteps = split(/-/,$value);
+					my $new_line;
+					foreach my $step (@newsteps) {
+						$new_line .= "\t".$step."\n";
+					}
+					$new_line .= '}';
+					$line = $new_line;
 				}
 				last;
-			} elsif ($key eq 'steps' && !$StartStepIndex && $line =~ /(\d+)(\[(\d+)\])?:(\d+)(\[(\d+)\])?/) {
-				if ($line =~ /^(\s+)/) { $spaces = $1; } else { $spaces = 0; }
-				$StartStepIndex = $StepsIndex;
+			} elsif ($key eq 'steps' && $line =~ /(\d+)(\[(\d+)\])?:(\d+)(\[(\d+)\])?/) {
+				push(@clean_lines, ($line_index - scalar @clean_lines));
 			} elsif ($key eq 'reverseend' && $line =~ /reverseend/i) {
-				$line =~ s/reverseend\s\d+/reverseend $value/i;
+				$line = "\treverseend ".$value;
 				last;
 			} elsif ($key eq 'timeout' && $line =~ /timeout/i) {
-				$line =~ s/timeout\s\d+/timeout $value/i;
+				$line = "\ttimeout ".$value;
 				last;
 			} else {
 				next;
@@ -297,12 +340,37 @@ sub FileWrite {
 			$Found = 1;
 		}
 	} continue {
-		$StepsIndex++;
+		$line_index++;
 	}
-	splice(@lines, $StartStepIndex, ($EndStepIndex-$StartStepIndex)) if ($key eq 'steps');
+	
+	if (!$Found) {
+		push(@lines,'');
+		push(@lines,'map '.$map.' {');
+		
+		if ($key eq 'steps') {
+			my @newsteps = split(/-/,$value);
+			foreach my $step (@newsteps) {
+				push(@lines,"\t".$step);
+			}
+		} elsif ($key eq "reverseend") {
+			push(@lines,"\treverseend ".$value);
+			
+		} elsif ($key eq "timeout") {
+			push(@lines,"\ttimeout ".$value);
+		}
+		
+		push(@lines,'}');
+		
+	} elsif ($key eq 'steps') {
+		foreach my $index (@clean_lines) {
+			splice(@lines, $index, 1);
+		}
+	}
+	
 	open(WRITE, ">:utf8", $controlfile);
 	print WRITE join ("\n", @lines);
 	close(WRITE);
+	
 	Commands::run("reload $betterWalk_file")
 }
 
