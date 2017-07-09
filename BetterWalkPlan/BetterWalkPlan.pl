@@ -29,7 +29,7 @@ my $chooks = Commands::register(
 
 sub on_unload {
 	Plugins::delHooks($start_hooks);
-	Plugins::delHooks($config_hooks);
+	Plugins::delHooks($config_hooks) if defined ($config_hooks);
 	Commands::unregister($chooks);
 	Settings::removeFile($file_handle) if (defined $file_handle);
 	undef $file_handle;

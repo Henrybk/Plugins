@@ -281,7 +281,7 @@ sub generateName {
 		} elsif ($rand == 5) {
 			$name = $biblicNames[rand @biblicNames]." ".$biblicNames[rand @biblicNames];
 		}
-		last if (length($name) <= 23);
+		last if (length($name) <= 23 && length($name) >= 16);
 	}
 	return $name;
 }
