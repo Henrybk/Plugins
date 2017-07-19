@@ -1,8 +1,25 @@
-package eventMacro::Data;
+package AnswerDatabse;
 
 use strict;
-use Settings;
+use Actor;
+use Modules 'register';
 use Globals;
+use Log qw(message debug error warning);
+use Misc;
+use Network;
+use Network::Send ();
+use Settings;
+use Plugins;
+use Skill;
+use Utils;
+use Utils::Exceptions;
+use AI;
+use Task;
+use Task::ErrorReport;
+use Match;
+use Translation;
+use I18N qw(stringToBytes);
+use Network::PacketParser qw(STATUS_STR STATUS_AGI STATUS_VIT STATUS_INT STATUS_DEX STATUS_LUK);
 
 require Exporter;
 our @ISA = qw(Exporter);
