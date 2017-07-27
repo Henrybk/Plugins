@@ -10,7 +10,6 @@ use SmartPathing::Grid;
 sub new {
 	my ($class, $type) = @_;
 	assert(defined $type) if DEBUG;
-	assert(UNIVERSAL::isa($type, "Grid")) if DEBUG;
 
 	my $self = $class->SUPER::new();
 

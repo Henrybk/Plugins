@@ -20,12 +20,13 @@ sub new {
 }
 
 sub reset_all_vars {
+	my ($self) = @_;
 	$self->{field} = undef;
 	
 	$self->{height} = undef;
 	$self->{width} = undef;
 	
-	$self->{grids_list} = new SmartPathing::GridLists;
+	$self->{grids_list} = new SmartPathing::GridLists('Grid');
 	
 	$self->{current_mother_grid} = undef;
 	

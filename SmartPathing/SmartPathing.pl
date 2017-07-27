@@ -49,27 +49,32 @@ sub on_packet_mapChange {
 sub on_add_monster_list {
 	my (undef, $args) = @_;
 	my $actor = $args;
+	
 	return unless (exists $nameID_obstacles{$actor->{nameID}});
 	
+	$obstaclesList{$actor->{binID}} = 1;
+	
 	$field_grid->add_mob_obstacle($actor->{binID});
+	
+	$mustRePath = 1;
 }
 
 sub on_monster_disappeared {
 	my (undef, $args) = @_;
 	my $actor = $args->{monster};
+	
 	if (exists $obstaclesList{$actor->{binID}}) {
 		delete $obstaclesList{$actor->{binID}};
-		
-	} elsif (exists $new_objects{$actor->{binID}}) {
-		delete $new_objects{$actor->{binID}};
 	}
 	
 	$field_grid->remove_mob_obstacle($actor->{binID});
+	
+	$mustRePath = 1;
 }
 
 sub on_AI_pre_manual {
 	return unless (AI::is("route"));
-	return unless (scalar %new_objects);
+	return unless ($mustRePath);
 	
 	$mustRePath = 1;
 	
@@ -106,11 +111,6 @@ sub on_PathFindingReset {
 	
 	$mustRePath = 0;
 	$args->{return} = 0;
-}
-
-sub get_added_weight {
-	my ($obs_x, $obs_y, $cell_x, $cell_y) = @_;
-	
 }
 
 return 1;

@@ -28,13 +28,13 @@ sub new {
 
 sub create_grid {
 	my ($self) = @_;
-	my $monster = $monstersList->get($obstacle_id);
+	my $monster = $monstersList->get($self->{mob_binID});
 	my $obs_x = $monster->{pos}{x};
 	my $obs_y = $monster->{pos}{y};
 	
 	for (my $y = ($obs_y - 14);     ($y <= ($obs_y + 14) && $y < $self->{height});   $y++) {
 		for (my $x = ($obs_x - 14); ($x <= ($obs_x + 14) && $x < $self->{width});    $x++) {
-			my $pos = $y * $args->{args}{field}{width} + $x;
+			my $pos = $y * $self->{width} + $x;
 			my $added_weight = get_added_weight($obs_x, $obs_y, $x, $y);
 			$self->{grid_changes}{$pos} = $added_weight;
 		}
@@ -43,7 +43,11 @@ sub create_grid {
 
 sub get_added_weight {
 	my ($obs_x, $obs_y, $cell_x, $cell_y) = @_;
+	my $distace = blockDistance( { x => $obs_x, y => $obs_y} , { x => $cell_x, y => $cell_y} );
 	
+	my $test_w = (15 - $distace);
+	
+	return $test_w;
 }
 
 1;
