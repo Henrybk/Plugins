@@ -25,6 +25,7 @@ my $hooks = Plugins::addHooks(
 my $mob_hooks = Plugins::addHooks(
 	['add_monster_list', \&on_add_monster_list, undef],
 	['monster_disappeared', \&on_monster_disappeared, undef],
+	['monster_moved', \&on_monster_moved, undef],
 );
 
 sub onUnload {
@@ -34,6 +35,7 @@ sub onUnload {
 
 my %nameID_obstacles = (
 	1013 => 1, #Wolf
+	1277 => 1
 );
 
 my %obstaclesList;
@@ -44,6 +46,8 @@ my $field_grid = new SmartPathing::FieldGrid();
 
 sub on_packet_mapChange {
 	$field_grid->set_mother_grid_field($field);
+	undef %obstaclesList;
+	$mustRePath = 0;
 }
 
 sub on_add_monster_list {
@@ -54,6 +58,8 @@ sub on_add_monster_list {
 	
 	$obstaclesList{$actor->{binID}} = 1;
 	
+	Log::warning "[test] Adding Monster $actor.\n";
+	
 	$field_grid->add_mob_obstacle($actor->{binID});
 	
 	$mustRePath = 1;
@@ -63,11 +69,26 @@ sub on_monster_disappeared {
 	my (undef, $args) = @_;
 	my $actor = $args->{monster};
 	
-	if (exists $obstaclesList{$actor->{binID}}) {
-		delete $obstaclesList{$actor->{binID}};
-	}
+	return unless (exists $obstaclesList{$actor->{binID}});
+	
+	delete $obstaclesList{$actor->{binID}};
+	
+	Log::warning "[test] Removing Monster $actor.\n";
 	
 	$field_grid->remove_mob_obstacle($actor->{binID});
+	
+	$mustRePath = 1;
+}
+
+sub on_monster_moved {
+	my (undef, $args) = @_;
+	my $actor = $args;
+	
+	return unless (exists $obstaclesList{$actor->{binID}});
+	
+	Log::warning "[test] Updating Monster $actor.\n";
+	
+	$field_grid->update_mob_obstacle($actor->{binID});
 	
 	$mustRePath = 1;
 }
@@ -76,40 +97,38 @@ sub on_AI_pre_manual {
 	return unless (AI::is("route"));
 	return unless ($mustRePath);
 	
-	$mustRePath = 1;
+	my $task;
 	
-	my $current_task = $char->args;
+	if (UNIVERSAL::isa($char->args, 'Task::Route')) {
+		$task = $char->args;
+		
+	} elsif ($char->args->getSubtask && UNIVERSAL::isa($char->args->getSubtask, 'Task::Route')) {
+		$task = $char->args->getSubtask;
+		
+	} else {
+		return;
+	}
 	
-	my $map = $field->baseName;
-	my $x = $current_task->{dest}{pos}{x};
-	my $y = $current_task->{dest}{pos}{y};
+	$mustRePath = 0;
 	
-	my %current_goal;
+	Log::warning "[test] Reseting route.\n";
 	
-	$current_goal{$_} = $current_task->{$_} for qw(maxDistance maxTime avoidWalls attackID attackOnRoute noSitAuto LOSSubRoute distFromGoal pyDistFromGoal notifyUponArrival);
-	
-	AI::clear(qw/route/);
-	
-	$char->route(
-		$map,
-		$x,
-		$y,
-		%current_goal
-	);
+	$task->resetRoute;
 }
 
 sub on_PathFindingReset {
 	my (undef, $args) = @_;
 	
-	return unless ($mustRePath);
+	return unless (scalar %obstaclesList);
+	
+	Log::warning "[test] Using grided info.\n";
 	
 	$args->{args}{width} = $args->{args}{field}{width} unless ($args->{args}{width});
 	$args->{args}{height} = $args->{args}{field}{height} unless ($args->{args}{height});
 	$args->{args}{timeout} = 1500 unless ($args->{args}{timeout});
 	
-	$args->{args}{distance_map} = $field_grid->get_final_grid();
+	$args->{args}{distance_map} = \($field_grid->get_final_grid());
 	
-	$mustRePath = 0;
 	$args->{return} = 0;
 }
 

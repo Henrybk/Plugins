@@ -26,7 +26,7 @@ sub reset_all_vars {
 	$self->{height} = undef;
 	$self->{width} = undef;
 	
-	$self->{grids_list} = new SmartPathing::GridLists('Grid');
+	$self->{grids_list} = new SmartPathing::GridLists('SmartPathing::Grid');
 	
 	$self->{current_mother_grid} = undef;
 	
@@ -46,12 +46,17 @@ sub set_mother_grid_field {
 	$self->{width} = $field->{width};
 	
 	$self->set_mother_grid;
-	$self->parse_current_final_grid;
+}
+
+sub set_mother_grid {
+	my ($self) = @_;
+	$self->{current_mother_grid} = $self->{field}{dstMap};
+	$self->{current_final_grid} = $self->{current_mother_grid};
 }
 
 sub add_mob_obstacle {
 	my ($self, $mob_binID) = @_;
-	my $grid = new Grid($self->{height}, $self->{width}, $mob_binID);
+	my $grid = new SmartPathing::Grid($self->{height}, $self->{width}, $mob_binID);
 	$self->{grids_list}->add($grid);
 	$self->add_grid($grid);
 }
@@ -63,31 +68,37 @@ sub remove_mob_obstacle {
 	$self->remove_grid($grid);
 }
 
-sub set_mother_grid {
-	my ($self) = @_;
-	$self->{current_mother_grid} = $self->{field}{dstMap};
-	$self->{current_final_grid} = $self->{current_mother_grid};
+sub update_mob_obstacle {
+	my ($self, $mob_binID) = @_;
+	my $grid = $self->{grids_list}->getByMobBinID($mob_binID);
+	$self->remove_grid($grid);
+	$grid->update();
+	$self->add_grid($grid);
 }
 
 sub add_grid {
 	my ($self, $grid) = @_;
 	foreach my $position (keys %{$grid->{grid_changes}}) {
-		my $weight = $grid->{grid_changes}{$position};
-		my $current_weight = unpack('C', substr($self->{current_final_grid}, $position, 1));
-		next if ($current_weight == 0);
-		my $new_weight = $current_weight + $weight;
-		substr($self->{current_final_grid}, $position, 1, pack('C', $new_weight));
+		my $current_dist = unpack('C', substr($self->{current_final_grid}, $position, 1));
+		next if ($current_dist == 0);
+		
+		my $dist = $grid->{grid_changes}{$position};
+		
+		#my $new_dist = $current_dist + $dist;
+		substr($self->{current_final_grid}, $position, 1, pack('C', $dist));
 	}
 }
 
 sub remove_grid {
 	my ($self, $grid) = @_;
 	foreach my $position (keys %{$grid->{grid_changes}}) {
-		my $weight = $grid->{grid_changes}{$position};
-		my $current_weight = unpack('C', substr($self->{current_final_grid}, $position, 1));
-		next if ($current_weight == 0);
-		my $new_weight = $current_weight - $weight;
-		substr($self->{current_final_grid}, $position, 1, pack('C', $new_weight));
+		my $current_dist = unpack('C', substr($self->{current_final_grid}, $position, 1));
+		next if ($current_dist == 0);
+		
+		#my $dist = $grid->{grid_changes}{$position};
+		
+		#my $new_dist = $current_dist - $dist;
+		substr($self->{current_final_grid}, $position, 1, substr($self->{current_mother_grid}, $position, 1));
 	}
 }
 

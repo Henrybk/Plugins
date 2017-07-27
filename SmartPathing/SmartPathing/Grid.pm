@@ -34,20 +34,38 @@ sub create_grid {
 	
 	for (my $y = ($obs_y - 14);     ($y <= ($obs_y + 14) && $y < $self->{height});   $y++) {
 		for (my $x = ($obs_x - 14); ($x <= ($obs_x + 14) && $x < $self->{width});    $x++) {
-			my $pos = $y * $self->{width} + $x;
-			my $added_weight = get_added_weight($obs_x, $obs_y, $x, $y);
-			$self->{grid_changes}{$pos} = $added_weight;
+			$self->{grid_changes}{($y * $self->{width} + $x)} = get_added_weight($obs_x, $obs_y, $x, $y);
 		}
 	}
 }
 
+sub update {
+	my ($self) = @_;
+	$self->{grid_changes} = {};
+	$self->create_grid();
+}
+
 sub get_added_weight {
 	my ($obs_x, $obs_y, $cell_x, $cell_y) = @_;
-	my $distace = blockDistance( { x => $obs_x, y => $obs_y} , { x => $cell_x, y => $cell_y} );
+	my $distace = int (distance( { x => $obs_x, y => $obs_y} , { x => $cell_x, y => $cell_y} ));
 	
-	my $test_w = (15 - $distace);
+	my $new_dist;
 	
-	return $test_w;
+	if ($distace <= 3) {
+		$new_dist = 1;
+		
+	} elsif ($distace <= 5) {
+		$new_dist = 2;
+		
+	} elsif ($distace <= 7) {
+		$new_dist = 3;
+		
+	} else {
+		$new_dist = $distace;
+	}
+	
+	return $new_dist;
 }
 
 1;
+#eval message sprintf "%s\n", ord substr $field->{dstMap}, $field->width * 289 + 90
