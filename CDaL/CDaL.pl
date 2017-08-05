@@ -165,7 +165,24 @@ sub charSelectScreenHook {
 		my $newCharName = generateName();
         message "[$plugin_name] Creating ".$config{$plugin_name.'_characterToCreate'}.": $newCharName\n", "system";
 
-		my @args = split(/\s+/, parseArgs($config{$plugin_name.'_characterToCreateInfo'}));
+		my @args = split(/\s+/, $config{$plugin_name.'_characterToCreateInfo'});
+		
+		# Hair Style
+		if ($args[0] =~ /\[(\d+)~(\d+)\]/) {
+			my @options = ($1..$2);
+			$args[0] = $options[rand @options];
+		}
+		
+		# Hair Color
+		if ($args[1] =~ /\[(\d+)~(\d+)\]/) {
+			my @options = ($1..$2);
+			$args[1] = $options[rand @options];
+		}
+		
+		# Sex
+		if ($args[2] =~ /\[m\|f\]/) {
+			$args[2] = ((rand() < 0.5) ? 'm' : 'f');
+		}
 		
 		unless (createCharacter($config{$plugin_name.'_characterToCreate'}, $newCharName, @args)) {
 			message "[$plugin_name] Invalid char creation config setting, please fix CDaL_characterToCreateInfo in config.txt\n", "system";

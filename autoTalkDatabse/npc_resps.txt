@@ -1,0 +1,14 @@
+
+autoTalkDatabase {
+	message => /bam/i;
+	name => /boy/i;
+	answer => 'r0';
+	actor_type => 'npc';
+	only_in_map => 'prontera';
+}
+
+autoTalkDatabase {
+	message => /Do you want to move/i;
+	answer => 'r0';
+	actor_type => 'portal';
+}
