@@ -90,15 +90,15 @@ sub on_refine_result {
 		if ($starCrumbCount) {
 			my $item = $char->inventory->getByNameID($starCrumbID);
 			if ($item) {
-				inventoryItemRemoved($item->{invIndex}, $starCrumbCount);
-				Plugins::callHook('packet_item_removed', {index => $item->{invIndex}});
+				inventoryItemRemoved($item->{binID}, $starCrumbCount);
+				Plugins::callHook('packet_item_removed', {index => $item->{binID}});
 			}
 		}
 		if ($elementalID) {
 			my $item = $char->inventory->getByNameID($elementalID);
 			if ($item) {
-				inventoryItemRemoved($item->{invIndex}, 1);
-				Plugins::callHook('packet_item_removed', {index => $item->{invIndex}});
+				inventoryItemRemoved($item->{binID}, 1);
+				Plugins::callHook('packet_item_removed', {index => $item->{binID}});
 			}
 		}
 	}
