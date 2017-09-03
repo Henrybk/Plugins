@@ -1,12 +1,12 @@
 ##############################
 # =======================
-# BetterShopper v1.0
+# BetterShopper v1.4
 # =======================
 # This plugin is licensed under the GNU GPL
 # Created by Henrybk from openkorebrasil
 # Based on the shopper plugin made by kaliwanagan on 2006 which was also licensed under the GNU GPL
 #
-# What it does: It is a plugin that is able to create, delete and change characters during play time.
+# What it does: Opens vending shops and buys desired items.
 #
 # Config keys (put in config.txt):
 #	BetterShopper_on 1/0  # Activates the plugin
@@ -48,20 +48,18 @@ my $base_hooks = Plugins::addHooks(
 	['configModify',  \&on_configModify]
 );
 
-my $plugin_name = 'BetterShopper';
-
 use constant {
+	PLUGIN_NAME => 'BetterShopper',
+	RECHECK_TIMEOUT => 30,
+	OPENSHOP_DELAY => 1,
 	INACTIVE => 0,
 	ACTIVE => 1
 };
 
-my $delay = 1;
 my $time = time;
 
 my %recently_checked;
 my %in_AI_queue;
-
-my $recheck_timeout = 60;
 
 my $shopping_hooks;
 
@@ -70,28 +68,27 @@ my $status = INACTIVE;
 sub Unload {
 	Plugins::delHook($base_hooks);
 	changeStatus(INACTIVE);
-	message "[$plugin_name] Plugin unloading or reloading.\n", 'success';
+	message "[".PLUGIN_NAME."] Plugin unloading or reloading.\n", 'success';
 }
 
 sub checkConfig {
-	if (exists $config{$plugin_name.'_on'} && $config{$plugin_name.'_on'} == 1) {
-		message "[$plugin_name] Config set to 'on' shopper will be active.\n", 'success';
+	if (exists $config{PLUGIN_NAME.'_on'} && $config{PLUGIN_NAME.'_on'} == 1) {
+		message "[".PLUGIN_NAME."] Config set to 'on' shopper will be active.\n", 'success';
 		return changeStatus(ACTIVE);
 	} else {
-		message "[$plugin_name] Config set to 'off' shopper will be inactive.\n", 'success';
 		return changeStatus(INACTIVE);
 	}
 }
 
 sub on_configModify {
 	my (undef, $args) = @_;
-	return unless ($args->{key} eq ($plugin_name.'_on'));
-	return if ($args->{val} eq $config{$plugin_name.'_on'});
+	return unless ($args->{key} eq (PLUGIN_NAME.'_on'));
+	return if ($args->{val} eq $config{PLUGIN_NAME.'_on'});
 	if ($args->{val} == 1) {
-		message "[$plugin_name] Config set to 'on' shopper will be active.\n", 'success';
+		message "[".PLUGIN_NAME."] Config set to 'on' shopper will be active.\n", 'success';
 		return changeStatus(ACTIVE);
 	} else {
-		message "[$plugin_name] Config set to 'on' shopper will be active.\n", 'success';
+		message "[".PLUGIN_NAME."] Config set to 'on' shopper will be active.\n", 'success';
 		return changeStatus(INACTIVE);
 	}
 }
@@ -103,27 +100,28 @@ sub changeStatus {
 	
 	if ($new_status == INACTIVE) {
 		Plugins::delHook($shopping_hooks);
-		debug "[$plugin_name] Plugin stage changed to 'INACTIVE'\n", "shopper", 1;
+		debug "[".PLUGIN_NAME."] Plugin stage changed to 'INACTIVE'\n", "shopper", 1;
 		AI::clear('checkShop');
 		undef %recently_checked;
 		undef %in_AI_queue;
 		
 	} elsif ($new_status == ACTIVE) {
 		$shopping_hooks = Plugins::addHooks(
-			['AI_pre', \&AI_pre],
-			['packet_vender', \&encounter],
-			['packet_vender_store', \&storeList],
-			['packet_mapChange', \&mapchange],
-			['player_disappeared', \&player_disappeared]
+			['AI_pre',              \&AI_pre],
+			['packet_vender',       \&encounter],
+			['packet_vender_store2',\&storeList],
+			['packet_mapChange',    \&mapchange],
+			['player_disappeared',  \&player_disappeared],
+			['packet/vender_lost',  \&shop_closed],
 		);
-		debug "[$plugin_name] Plugin stage changed to 'ACTIVE'\n", "shopper", 1;
+		debug "[".PLUGIN_NAME."] Plugin stage changed to 'ACTIVE'\n", "shopper", 1;
 		
 		foreach my $vender_index (0..$#venderListsID) {
 			my $venderID = $venderListsID[$vender_index];
 			next unless (defined $venderID);
 			my $vender = $venderLists{$venderID};
 			
-			debug "[$plugin_name] Adding shop '".$vender->{'title'}."' of player '".get_player_name($venderID)."' to AI queue check list.\n", "shopper", 1;
+			debug "[".PLUGIN_NAME."] Adding shop '".$vender->{'title'}."' of player '".get_player_name($venderID)."' to AI queue check list.\n", "shopper", 1;
 			AI::queue('checkShop', {vendorID => $venderID});
 		}
 	}
@@ -133,7 +131,7 @@ sub changeStatus {
 
 sub mapchange {
 	if (AI::inQueue('checkShop')) {
-		debug "[$plugin_name] Clearing all 'checkShop' instances from AI queue because of a mapchange.\n", "shopper", 1;
+		debug "[".PLUGIN_NAME."] Clearing all 'checkShop' instances from AI queue because of a mapchange.\n", "shopper", 1;
 		AI::clear('checkShop');
 	}
 }
@@ -146,17 +144,17 @@ sub get_player_name {
 }
 
 sub AI_pre {
-	if (AI::is('checkShop') && main::timeOut($time, $delay)) {
+	if (AI::is('checkShop') && main::timeOut($time, OPENSHOP_DELAY)) {
+		$time = time;
 		my $vendorID = AI::args->{vendorID};
 		my $vender = $venderLists{$vendorID};
 		if (defined $vender && grep { $vendorID eq $_ } @venderListsID) {
-			debug "[$plugin_name] Openning shop '".$vender->{'title'}."' of player ".get_player_name($vendorID).".\n", "shopper", 1;
+			debug "[".PLUGIN_NAME."] Openning shop '".$vender->{'title'}."' of player ".get_player_name($vendorID).".\n", "shopper", 1;
 			$messageSender->sendEnteringVender($vendorID);
 		}
 		delete $in_AI_queue{$vendorID};
 		AI::dequeue;
 	}
-	$time = time;
 }
 
 # we encounter a vend shop
@@ -166,15 +164,15 @@ sub encounter {
 	my $title = bytesToString($args->{title});
 	
 	if (!exists $in_AI_queue{$ID}) {
-		if ( !exists $recently_checked{$ID} || ( exists $recently_checked{$ID} && main::timeOut($recently_checked{$ID}, $recheck_timeout) ) ) {
+		if ( !exists $recently_checked{$ID} || ( exists $recently_checked{$ID} && main::timeOut($recently_checked{$ID}, RECHECK_TIMEOUT) ) ) {
 			$in_AI_queue{$ID} = 1;
-			debug "[$plugin_name] Adding shop '".$title."' of player ".get_player_name($ID)." to AI queue check list.\n", "shopper", 1;
+			debug "[".PLUGIN_NAME."] Adding shop '".$title."' of player ".get_player_name($ID)." to AI queue check list.\n", "shopper", 1;
 			AI::queue('checkShop', {vendorID => $ID});
 		}
 	}
 }
 
-sub lost {
+sub shop_closed {
 	my ($packet, $args) = @_;
 	my $ID = $args->{ID};
 	if (exists $in_AI_queue{$ID}) {
@@ -183,7 +181,7 @@ sub lost {
 			my $seq_args = @AI::ai_seq_args[$seq_index];
 			next unless ($seq eq 'checkShop');
 			next unless ($seq_args->{vendorID} eq $ID);
-			debug "[$plugin_name] Removing player ".get_player_name($ID)." from AI queue check list because shop disappeared.\n", "shopper", 1;
+			debug "[".PLUGIN_NAME."] Removing player ".get_player_name($ID)." from AI queue check list because shop disappeared.\n", "shopper", 1;
 			splice(@AI::ai_seq, $seq_index, 1);
 			splice(@AI::ai_seq_args, $seq_index, 1);
 			last;
@@ -201,7 +199,7 @@ sub player_disappeared {
 			my $seq_args = @AI::ai_seq_args[$seq_index];
 			next unless ($seq eq 'checkShop');
 			next unless ($seq_args->{vendorID} eq $ID);
-			debug "[$plugin_name] Removing player ".get_player_name($ID)." from AI queue check list because player disappeared.\n", "shopper", 1;
+			debug "[".PLUGIN_NAME."] Removing player ".get_player_name($ID)." from AI queue check list because player disappeared.\n", "shopper", 1;
 			splice(@AI::ai_seq, $seq_index, 1);
 			splice(@AI::ai_seq_args, $seq_index, 1);
 			last;
@@ -212,41 +210,68 @@ sub player_disappeared {
 # we're currently inside a store if we receive this packet
 sub storeList {
 	my ($packet, $args) = @_;
-	my $venderID = $args->{venderID};
-	my $price = $args->{price};
-	my $name = $args->{name};
-	my $number = $args->{number};
-	my $amount = $args->{amount};
 	
 	$recently_checked{$venderID} = time;
-
-	my $prefix = $plugin_name.'_';
-	my $i = 0;
-	while (exists $config{$prefix.$i}) {
-		my $maxPrice = $config{$prefix.$i."_maxPrice"};
-		my $maxAmount = $config{$prefix.$i."_maxAmount"};
-
-		if (
-			main::checkSelfCondition($prefix.$i) &&
-			($price <= $maxPrice) &&
-			(lc($name) eq lc($config{$prefix.$i}))
-		) {
-			my $max_can_buy = floor($char->{zeny} / $price);
-			my $max_possible = $amount >= $max_can_buy ? $max_can_buy : $amount;
-			my $will_buy = $max_possible >= $maxAmount ? $maxAmount : $max_possible;
-			
-			message "Found item $name with good price! Price is $price, max price for it is $maxPrice! We want $maxAmount, the store has $amount and we can buy $max_possible! Buying $will_buy of it!\n";
-			
-			$messageSender->sendBuyBulkVender($venderID, [{itemIndex => $number, amount => $will_buy}], $venderCID);
-			
-			if ($will_buy == $maxAmount) {
-				configModify($prefix.$i."_disabled", 1);
-			} else {
-				configModify($prefix.$i."_maxAmount", ($maxAmount - $will_buy));
-			}
+	
+	my @buyList;
+	
+	my $current_zeny = $char->{zeny};
+	
+	foreach my $item (@{$args->{itemList}->getItems}) {
+		my $price = $item->{price};
+		my $name = $item->{name};
+		
+		my $prefix = PLUGIN_NAME.'_';
+		my $current = 1;
+		my $definitive;
+		while (exists $config{$prefix.$current}) {
+			next unless (lc($name) eq lc($config{$prefix.$current}));
+			next unless ($price <= $config{$prefix.$current."_maxPrice"});
+			next unless (main::checkSelfCondition($prefix.$current));
+			$definitive = $current;
+			last;
+		} continue {
+			$current++;
 		}
-		$i++;
+		
+		next unless (defined $definitive);
+		
+		my $config = $prefix.$definitive;
+		
+		my $maxPrice = $config{$config."_maxPrice"};
+		my $maxAmount = $config{$config."_maxAmount"};
+		
+		my $index = $item->{ID};
+		my $amount = $item->{amount};
+		
+		my $inv_amount = $char->inventory->sumByName($name);
+		
+		return unless ($inv_amount < $maxAmount);
+		
+		my $max_wanted = $maxAmount - $inv_amount;
+		
+		my $max_can_buy = floor($current_zeny / $price);
+		my $max_possible = $amount >= $max_can_buy ? $max_can_buy : $amount;
+		
+		my $will_buy = $max_possible >= $max_wanted ? $max_wanted : $max_possible;
+		
+		next if ($will_buy == 0);
+		
+		message "Found item $name with good price! Price is $price, max price for it is $maxPrice! The store has $amount of it, with our zeny we can buy $max_possible! Buying $will_buy of it!\n";
+		
+		my $zeny_wasted = $will_buy * $price;
+		
+		$current_zeny -= $zeny_wasted;
+		
+		my %buy = (
+			itemIndex => $index,
+			amount    => $will_buy,
+		);
+		
+		push(@buyList, \%buy);
 	}
+	
+	$messageSender->sendBuyBulkVender($venderID, \@buyList, $venderCID);
 }
 
 return 1;
