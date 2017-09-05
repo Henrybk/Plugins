@@ -161,7 +161,7 @@ sub AI_pre {
 sub encounter {
 	my ($packet, $args) = @_;
 	my $ID = $args->{ID};
-	my $title = bytesToString($args->{title});
+	my $title = $args->{title};
 	
 	if (!exists $in_AI_queue{$ID}) {
 		if ( !exists $recently_checked{$ID} || ( exists $recently_checked{$ID} && main::timeOut($recently_checked{$ID}, RECHECK_TIMEOUT) ) ) {
