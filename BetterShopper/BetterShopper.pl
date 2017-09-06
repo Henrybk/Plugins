@@ -217,6 +217,8 @@ sub storeList {
 	
 	my $current_zeny = $char->{zeny};
 	
+	my %bought;
+	
 	foreach my $item (@{$args->{itemList}->getItems}) {
 		my $price = $item->{price};
 		my $name = $item->{name};
@@ -246,9 +248,13 @@ sub storeList {
 		
 		my $inv_amount = $char->inventory->sumByName($name);
 		
-		return unless ($inv_amount < $maxAmount);
+		my $buy_amount = (exists $bought{$name} ? $bought{$name} : 0);
 		
-		my $max_wanted = $maxAmount - $inv_amount;
+		my $total = $inv_amount + $buy_amount;
+		
+		return unless ($total < $maxAmount);
+		
+		my $max_wanted = $maxAmount - $total;
 		
 		my $max_can_buy = floor($current_zeny / $price);
 		my $max_possible = $amount >= $max_can_buy ? $max_can_buy : $amount;
@@ -261,6 +267,8 @@ sub storeList {
 		
 		my $zeny_wasted = $will_buy * $price;
 		
+		$bought{$name} += $will_buy;
+		
 		$current_zeny -= $zeny_wasted;
 		
 		my %buy = (
@@ -270,6 +278,8 @@ sub storeList {
 		
 		push(@buyList, \%buy);
 	}
+	
+	return unless (@buyList);
 	
 	$messageSender->sendBuyBulkVender($venderID, \@buyList, $venderCID);
 }
