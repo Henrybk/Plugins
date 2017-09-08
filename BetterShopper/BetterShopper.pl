@@ -252,7 +252,7 @@ sub storeList {
 		
 		my $total = $inv_amount + $buy_amount;
 		
-		return unless ($total < $maxAmount);
+		next unless ($total < $maxAmount);
 		
 		my $max_wanted = $maxAmount - $total;
 		
