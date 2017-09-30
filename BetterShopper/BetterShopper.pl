@@ -1,6 +1,6 @@
 ##############################
 # =======================
-# BetterShopper v1.7
+# BetterShopper v1.8
 # =======================
 # This plugin is licensed under the GNU GPL
 # Created by Henrybk from openkorebrasil
