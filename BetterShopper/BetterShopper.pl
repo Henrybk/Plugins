@@ -224,7 +224,7 @@ sub storeList {
 		my $name = $item->{name};
 		
 		my $prefix = PLUGIN_NAME.'_';
-		my $current = 1;
+		my $current = 0;
 		my $definitive;
 		while (exists $config{$prefix.$current}) {
 			next unless (lc($name) eq lc($config{$prefix.$current}));
