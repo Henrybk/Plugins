@@ -50,7 +50,7 @@ sub set_mother_grid_field {
 
 sub set_mother_grid {
 	my ($self) = @_;
-	$self->{current_mother_grid} = $self->{field}{dstMap};
+	$self->{current_mother_grid} = $self->{field}{weightMap};
 	$self->{current_final_grid} = $self->{current_mother_grid};
 }
 
@@ -79,26 +79,28 @@ sub update_mob_obstacle {
 sub add_grid {
 	my ($self, $grid) = @_;
 	foreach my $position (keys %{$grid->{grid_changes}}) {
-		my $current_dist = unpack('C', substr($self->{current_final_grid}, $position, 1));
-		next if ($current_dist == 0);
+		my $current_weight = unpack('C', substr($self->{current_final_grid}, $position, 1));
+		next if ($current_weight == 0);
 		
-		my $dist = $grid->{grid_changes}{$position};
+		my $weight_changed = $grid->{grid_changes}{$position};
 		
-		#my $new_dist = $current_dist + $dist;
-		substr($self->{current_final_grid}, $position, 1, pack('C', $dist));
+		my $new_weight = $current_weight + $weight_changed;
+		
+		substr($self->{current_final_grid}, $position, 1, pack('C', $new_weight));
 	}
 }
 
 sub remove_grid {
 	my ($self, $grid) = @_;
 	foreach my $position (keys %{$grid->{grid_changes}}) {
-		my $current_dist = unpack('C', substr($self->{current_final_grid}, $position, 1));
-		next if ($current_dist == 0);
+		my $current_weight = unpack('C', substr($self->{current_final_grid}, $position, 1));
+		next if ($current_weight == 0);
 		
-		#my $dist = $grid->{grid_changes}{$position};
+		my $weight_changed = $grid->{grid_changes}{$position};
 		
-		#my $new_dist = $current_dist - $dist;
-		substr($self->{current_final_grid}, $position, 1, substr($self->{current_mother_grid}, $position, 1));
+		my $new_weight = $current_weight - $weight_changed;
+		
+		substr($self->{current_final_grid}, $position, 1, pack('C', $new_weight));
 	}
 }
 

@@ -33,7 +33,7 @@ sub create_grid {
 	my $obs_y = $monster->{pos}{y};
 	
 	for (my $y = ($obs_y - 14);     ($y <= ($obs_y + 14) && $y < $self->{height});   $y++) {
-		for (my $x = ($obs_x - 14); ($x <= ($obs_x + 14) && $x < $self->{width});    $x++) {
+		for (my $x = ($obs_x - 14);     ($x <= ($obs_x + 14) && $x < $self->{width});   $x++) {
 			$self->{grid_changes}{($y * $self->{width} + $x)} = get_added_weight($obs_x, $obs_y, $x, $y);
 		}
 	}
@@ -47,25 +47,23 @@ sub update {
 
 sub get_added_weight {
 	my ($obs_x, $obs_y, $cell_x, $cell_y) = @_;
-	my $distace = int (distance( { x => $obs_x, y => $obs_y} , { x => $cell_x, y => $cell_y} ));
 	
-	my $new_dist;
+	my $xDistance = abs($obs_x - $cell_x);
+    my $yDistance = abs($obs_y - $cell_y);
+	my $cell_distance = (($xDistance > $yDistance) ? $xDistance : $yDistance);
 	
-	if ($distace <= 3) {
-		$new_dist = 1;
-		
-	} elsif ($distace <= 5) {
-		$new_dist = 2;
-		
-	} elsif ($distace <= 7) {
-		$new_dist = 3;
+	my @weights = (50, 50, 50, 15, 10, 5);
+	
+	my $weight_change;
+	
+	if ($cell_distance <= $#weights) {
+		$weight_change = $weights[$cell_distance];
 		
 	} else {
-		$new_dist = $distace;
+		$weight_change = 0;
 	}
 	
-	return $new_dist;
+	return $weight_change;
 }
 
 1;
-#eval message sprintf "%s\n", ord substr $field->{dstMap}, $field->width * 289 + 90

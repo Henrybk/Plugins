@@ -34,8 +34,8 @@ sub onUnload {
 }
 
 my %nameID_obstacles = (
-	1013 => 1, #Wolf
-	1277 => 1
+	#1013 => 1, #Wolf
+	1277 => 1,
 );
 
 my %obstaclesList;
@@ -111,6 +111,11 @@ sub on_AI_pre_manual {
 	
 	$mustRePath = 0;
 	
+	if (scalar @{$task->{solution}} == 0) {
+		Log::warning "[test] Route already reseted.\n";
+		return;
+	}
+	
 	Log::warning "[test] Reseting route.\n";
 	
 	$task->resetRoute;
@@ -119,15 +124,18 @@ sub on_AI_pre_manual {
 sub on_PathFindingReset {
 	my (undef, $args) = @_;
 	
-	return unless (scalar %obstaclesList);
+	Log::warning "[test] There are ".scalar keys(%obstaclesList)." obstacles.\n";
+	
+	return unless (keys(%obstaclesList) > 0);
 	
 	Log::warning "[test] Using grided info.\n";
+	
+	$args->{args}{weight_map} = \($field_grid->get_final_grid());
+	$args->{args}{avoidWalls} = 1;
 	
 	$args->{args}{width} = $args->{args}{field}{width} unless ($args->{args}{width});
 	$args->{args}{height} = $args->{args}{field}{height} unless ($args->{args}{height});
 	$args->{args}{timeout} = 1500 unless ($args->{args}{timeout});
-	
-	$args->{args}{distance_map} = \($field_grid->get_final_grid());
 	
 	$args->{return} = 0;
 }
