@@ -36,6 +36,7 @@ use Globals;
 use Log qw(message warning error debug);
 use AI;
 use Misc;
+use Utils qw(getFormattedDate);
 use Network;
 use Network::Send;
 use POSIX;
@@ -57,12 +58,9 @@ use constant {
 };
 
 my $time = time;
-
 my %recently_checked;
 my %in_AI_queue;
-
 my $shopping_hooks;
-
 my $status = INACTIVE;
 
 sub Unload {
@@ -211,12 +209,9 @@ sub player_disappeared {
 sub storeList {
 	my ($packet, $args) = @_;
 	
-	$recently_checked{$venderID} = time;
-	
-	my @buyList;
-	
-	my $current_zeny = $char->{zeny};
-	
+	$recently_checked{$venderID} = time;	
+	my @buyList;	
+	my $current_zeny = $char->{zeny};	
 	my %bought;
 	
 	foreach my $item (@{$args->{itemList}->getItems}) {
@@ -238,37 +233,24 @@ sub storeList {
 		
 		next unless (defined $definitive);
 		
-		my $config = $prefix.$definitive;
-		
+		my $config = $prefix.$definitive;		
 		my $maxPrice = $config{$config."_maxPrice"};
-		my $maxAmount = $config{$config."_maxAmount"};
-		
+		my $maxAmount = $config{$config."_maxAmount"};		
 		my $index = $item->{ID};
-		my $amount = $item->{amount};
-		
-		my $inv_amount = $char->inventory->sumByName($name);
-		
-		my $buy_amount = (exists $bought{$name} ? $bought{$name} : 0);
-		
-		my $total = $inv_amount + $buy_amount;
-		
-		next unless ($total < $maxAmount);
-		
-		my $max_wanted = $maxAmount - $total;
-		
+		my $amount = $item->{amount};		
+		my $inv_amount = $char->inventory->sumByName($name);		
+		my $buy_amount = (exists $bought{$name} ? $bought{$name} : 0);		
+		my $total = $inv_amount + $buy_amount;		
+		next unless ($total < $maxAmount);		
+		my $max_wanted = $maxAmount - $total;		
 		my $max_can_buy = floor($current_zeny / $price);
-		my $max_possible = $amount >= $max_can_buy ? $max_can_buy : $amount;
-		
-		my $will_buy = $max_possible >= $max_wanted ? $max_wanted : $max_possible;
-		
+		my $max_possible = $amount >= $max_can_buy ? $max_can_buy : $amount;		
+		my $will_buy = $max_possible >= $max_wanted ? $max_wanted : $max_possible;		
 		next if ($will_buy == 0);
 		
-		message "Found item $name with good price! Price is $price, max price for it is $maxPrice! The store has $amount of it, with our zeny we can buy $max_possible! Buying $will_buy of it!\n";
-		
-		my $zeny_wasted = $will_buy * $price;
-		
-		$bought{$name} += $will_buy;
-		
+		writter("Found item $name with good price! Price is $price, max price for it is $maxPrice! The store has $amount of it, with our zeny we can buy $max_possible! Buying $will_buy of it!");
+		my $zeny_wasted = $will_buy * $price;		
+		$bought{$name} += $will_buy;		
 		$current_zeny -= $zeny_wasted;
 		
 		my %buy = (
@@ -283,6 +265,17 @@ sub storeList {
 	
 	$messageSender->sendBuyBulkVender($venderID, \@buyList, $venderCID);
 }
+sub writter {
+	my ($args, $self) = @_;
+	my $tmp = "$Settings::logs_folder/Shopper.txt";
+	
+	open my $out, '>>:utf8', $tmp or die "Erro ao Abrir Arquivo";
+	print $out "[".getFormattedDate(int(time))."] $args  \n";
+	warning "$args \n";
+	close $out;
+	}
+	
+
 
 return 1;
 
