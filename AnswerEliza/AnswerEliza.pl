@@ -7,6 +7,10 @@
 # How to use:
 # Just copy the damn files and folders as they are to your plugins folder and be sure it is active in your sys.txt (if you don't know how to do that just look at openkore's wiki)
 #
+# Also put these keys in tour config.txt
+#   AnswerEliza_file AnswerEliza.txt
+#   AnswerEliza_Pm 1
+#
 #########################################################################
 package AnswerEliza;
 
