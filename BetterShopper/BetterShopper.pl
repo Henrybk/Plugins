@@ -243,7 +243,7 @@ sub storeList {
 		my $total = $inv_amount + $buy_amount;		
 		next unless ($total < $maxAmount);		
 		my $max_wanted = $maxAmount - $total;		
-		my $max_can_buy = floor($current_zeny / $price);
+		my $max_can_buy = ($price == 0) ? $max_wanted : floor($current_zeny / $price);
 		my $max_possible = $amount >= $max_can_buy ? $max_can_buy : $amount;		
 		my $will_buy = $max_possible >= $max_wanted ? $max_wanted : $max_possible;		
 		next if ($will_buy == 0);
