@@ -46,11 +46,6 @@ sub onUnload {
 }
 
 my %mob_nameID_obstacles = (
-	1368 => { #Planta carnívora
-		weight => [1000, 1000, 1000, 1000, 50, 40, 30, 20],
-		avoid => [1, 1, 1, 1],
-		min_dist_to_account => 4
-	},
 	1084 => { #black shrom
 		weight => [1000, 1000, 1000, 1000, 50, 40, 30, 20],
 		avoid => [1, 1, 1, 1],
