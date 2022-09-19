@@ -14,8 +14,9 @@ use Log qw(message error debug warning);
 Plugins::register('checkAggressive', 'checkAggressive', \&Unload, \&Unload);
 
 my $hooks = Plugins::addHooks(
-	['start3',						\&on_start3, undef],
-	['ai_check_Aggressiveness',		\&on_ai_check_Aggressiveness, undef],
+	['start3',								\&on_start3, undef],
+	['ai_check_Aggressiveness',				\&on_ai_check_Aggressiveness, undef],
+	['ai_slave_check_Aggressiveness',		\&on_ai_slave_check_Aggressiveness, undef],
 );
 
 use constant {
@@ -60,6 +61,7 @@ sub on_ai_check_Aggressiveness {
 	my ($self, $args) = @_;
 	
 	my $monster = $args->{monster};
+	my $ID = $monster->{ID};
 	
 	return unless (exists $mobs_info->{$monster->{nameID}});
 	return unless ($mobs_info->{$monster->{nameID}}{is_aggressive} == 1);
@@ -67,11 +69,44 @@ sub on_ai_check_Aggressiveness {
 	#$mobs_info->{$monster->{nameID}}{lvl}
 	#$mobs_info->{$monster->{nameID}}{is_aggressive}
 	
-	return unless (Misc::checkMonsterCleanness($monster->{ID}));
 	
-	return unless (Misc::objectIsMovingTowards($monster, $char));
+	my $found_clean = 0;
+	my $found_moving = 0;
+	
+	$found_clean = 1  if (Misc::checkMonsterCleanness($ID));
+	$found_moving = 1 if (Misc::objectIsMovingTowards($monster, $char));
+	
+	foreach my $slave (values %{$char->{slaves}}) {
+		$found_clean = 1  if (Misc::slave_checkMonsterCleanness($slave, $ID));
+		$found_moving = 1 if (Misc::objectIsMovingTowards($monster, $slave));
+	}
+	
+	return unless ($found_clean && $found_moving);
 	
 	debug "[".PLUGIN_NAME."] Monster $monster at ($monster->{pos}{x} $monster->{pos}{y}) | Lvl $mobs_info->{$monster->{nameID}}{lvl} | is Aggressive, clean, and coming to us\n";
+	
+	$args->{return} = 1;
+	return;
+}
+
+sub on_ai_slave_check_Aggressiveness {
+	my ($self, $args) = @_;
+	
+	my $monster = $args->{monster};
+	my $ID = $monster->{ID};
+	my $slave = $args->{slave};
+	
+	return unless (exists $mobs_info->{$monster->{nameID}});
+	return unless ($mobs_info->{$monster->{nameID}}{is_aggressive} == 1);
+	
+	#$mobs_info->{$monster->{nameID}}{lvl}
+	#$mobs_info->{$monster->{nameID}}{is_aggressive}
+	
+	return unless (Misc::slave_checkMonsterCleanness($slave, $ID) || Misc::checkMonsterCleanness($ID));
+	
+	return unless (Misc::objectIsMovingTowards($monster, $slave) || Misc::objectIsMovingTowards($monster, $char));
+	
+	debug "[".PLUGIN_NAME."] Monster $monster at ($monster->{pos}{x} $monster->{pos}{y}) | Lvl $mobs_info->{$monster->{nameID}}{lvl} | is Aggressive towards slave, clean, and coming to him\n";
 	
 	$args->{return} = 1;
 	return;
