@@ -1,0 +1,441 @@
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+#include <math.h>
+#include "algorithm.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
+
+#define NONE 0
+#define OPEN 1
+#define CLOSED 2
+
+#ifdef WIN32
+	#include <windows.h>
+#else
+	#include <sys/time.h>
+	static unsigned long
+	GetTickCount ()
+	{
+		struct timeval tv;
+		gettimeofday (&tv, (struct timezone *) NULL);
+		return (tv.tv_sec * 1000) + (tv.tv_usec / 1000);
+	}
+#endif /* WIN32 */
+
+
+/*******************************************/
+
+// Create a new, empty drunkpath session.
+// You must initialize it with CalcDrunkPath_init()
+CalcDrunkPath_session *
+CalcDrunkPath_new ()
+{
+	CalcDrunkPath_session *session;
+
+	session = (CalcDrunkPath_session*) malloc (sizeof (CalcDrunkPath_session));
+	
+	session->initialized = 0;
+	session->run = 0;
+	
+	return session;
+}
+
+// Create a new drunkpath session, or reset an existing session.
+// Resetting is preferred over destroying and creating, because it saves unnecessary memory allocations, thus improving performance.
+void
+CalcDrunkPath_init (CalcDrunkPath_session *session)
+{
+	// Allocate enough memory in currentMap to hold all nodes in the map
+	// Here we use calloc instead of malloc (calloc sets all memory allocated to 0's) so all uninitialized cells have whichlist set to NONE
+	session->currentMap = (Node*) calloc(session->height * session->width, sizeof(Node));
+	
+	unsigned long goalAdress = (session->endY * session->width) + session->endX;
+	Node* goal = &session->currentMap[goalAdress];
+	goal->x = session->endX;
+	goal->y = session->endY;
+	goal->nodeAdress = goalAdress;
+	
+	unsigned long startAdress = (session->startY * session->width) + session->startX;
+	Node* start = &session->currentMap[startAdress];
+	start->x = session->startX;
+	start->y = session->startY;
+	start->nodeAdress = startAdress;
+	start->h = heuristic_drunk_cost_estimate(start->x, start->y, goal->x, goal->y);
+	start->f = start->h;
+	
+	session->initialized = 1;
+}
+
+// The actual A* drunkpath algorithm, loops until it finds a path or runs out of time.
+int 
+CalcDrunkPath_pathStep (CalcDrunkPath_session *session)
+{
+	if (!session->initialized) {
+		printf("[drunkpath run error] You must call 'reset' before 'run'.\n");
+		return -2;
+	}
+	
+	Node* start = &session->currentMap[((session->startY * session->width) + session->startX)];
+	Node* goal = &session->currentMap[((session->endY * session->width) + session->endX)];
+	
+	if (!session->run) {
+		session->run = 1;
+		session->openListSize = 0;
+		// Allocate enough memory in openList to hold the adress of all nodes in the map
+		session->openList = (unsigned long*) malloc((session->height * session->width) * sizeof(unsigned long));
+		
+		// To initialize the drunkpath add only the start node to openList
+		openListAdd_drunk (session, start);
+	}
+	
+	// If the start node and goal node are the same return a valid path with length 0
+	if (goal->nodeAdress == start->nodeAdress) {
+		session->solution_size = 0;
+		return 1;
+	}
+	
+	Node* currentNode;
+	Node* neighborNode;
+	
+	short i;
+	
+	// All possible directions the character can move (in order: north, south, east, west, northeast, southeast, southwest, northwest)
+	short i_x[8] = {0, 0, 1, -1, 1, 1, -1, -1};
+	short i_y[8] = {1, -1, 0, 0, 1, -1, -1, 1};
+	
+	int neighbor_x;
+	int neighbor_y;
+	unsigned long neighbor_adress;
+	unsigned long distanceFromCurrent;
+	int drunk;
+	
+	unsigned int g_score = 0;
+	
+	unsigned long timeout = (unsigned long) GetTickCount();
+	int loop = 0;
+	
+	while (1) {
+		// If the openList is empty no path exists
+		if (session->openListSize == 0) {
+			return -1;
+		}
+		
+		// Every 100th loop check if we have ran out if time
+		loop++;
+		if (loop == 100) {
+			if (GetTickCount() - timeout > session->time_max) {
+				printf("[drunkpath run error] drunkpath ended before provided time.\n");
+				return -3;
+			} else
+				loop = 0;
+		}
+		
+		// Set currentNode to the top node in openList, and remove it from openList.
+		currentNode = openListGetLowest_drunk (session);
+
+		// If currentNode is the goal we have reached the destination, reconstruct and return the path.
+		if (goal->predecessor) {
+			//return path
+			reconstruct_drunk_path(session, goal, start);
+			return 1;
+		}
+		
+		// Loop between all neighbors
+		for (i = 0; i <= 7; i++)
+		{
+			neighbor_x = currentNode->x + i_x[i];
+			neighbor_y = currentNode->y + i_y[i];
+
+			if (neighbor_x > session->max_x || neighbor_y > session->max_y || neighbor_x < session->min_x || neighbor_y < session->min_y) {
+				continue;
+			}
+
+			neighbor_adress = (neighbor_y * session->width) + neighbor_x;
+
+			// Unwalkable nodes have weight -1, if a neighbor is unwalkable ignore it.
+			if (session->map_base_weight[neighbor_adress] == -1) {
+				continue;
+			}
+			
+			neighborNode = &session->currentMap[neighbor_adress];
+			
+			// If a neighbor is in closedList ignore it, it has already been expanded and has its lowest possible g_score
+			if (neighborNode->whichlist == CLOSED) {
+				continue;
+			}
+			
+			// First 4 neighbors in the list are in a ortogonal path and the last 4 are in a diagonal path from currentNode.
+			if (i >= 4) {
+				// If neighborNode has a diagonal path from currentNode then we can only move to it if both ortogonal composite nodes are walkable. (example: To move to the northeast both north and east must be walkable)
+			   if (session->map_base_weight[(currentNode->y * session->width) + neighbor_x] == -1 || session->map_base_weight[(neighbor_y * session->width) + currentNode->x] == -1) {
+					continue;
+				}
+				// We use 14 as the diagonal movement weight
+				distanceFromCurrent = 14;
+			} else {
+				// We use 10 for ortogonal movement weight
+				distanceFromCurrent = 10;
+			}
+			
+			// If drunk
+			if (session->drunkness) {
+				drunk = rand() % session->drunkness;
+				distanceFromCurrent += drunk;
+			}
+			
+			// If avoidWalls is true we add weight to cells near walls to disencourage the algorithm to move to them.
+			if (session->avoidWalls) {
+				distanceFromCurrent += session->map_base_weight[neighbor_adress];
+			}
+			
+			// g_score is the summed weight of all nodes from start node to neighborNode, which is the g_score of currentNode + the weight to move from currentNode to neighborNode.
+			g_score = currentNode->g + distanceFromCurrent;
+			
+			// If neighborNode is not in openList neither in closedList it has not been reached yet, initialize it and add it to openList
+			if (neighborNode->whichlist == NONE) {
+				neighborNode->x = neighbor_x;
+				neighborNode->y = neighbor_y;
+				neighborNode->nodeAdress = neighbor_adress;
+				neighborNode->predecessor = currentNode->nodeAdress;
+				neighborNode->g = g_score;
+				neighborNode->h = heuristic_drunk_cost_estimate(neighborNode->x, neighborNode->y, session->endX, session->endY);
+				neighborNode->f = neighborNode->g + neighborNode->h;
+				openListAdd_drunk (session, neighborNode);
+			
+			// If neighborNode is in a list it has to be in openList, since we cannot access nodes in closedList. 
+			} else {
+				// Check if we have found a shorter path to neighborNode, if so update it to have currentNode as its predecessor.
+				if (g_score < neighborNode->g) {
+					neighborNode->predecessor = currentNode->nodeAdress;
+					neighborNode->g = g_score;
+					neighborNode->f = neighborNode->g + neighborNode->h;
+					// Here we could remove neighborNode from openList and add it again to get it to the right position, but reajusting it saves time.
+					reajustOpenListItem_drunk (session, neighborNode);
+				}
+			}
+		}
+	}
+	return -1;
+}
+
+// The heuristic used is diagonal distance.
+int
+heuristic_drunk_cost_estimate (int currentX, int currentY, int goalX, int goalY)
+{
+	int xDistance = abs(currentX - goalX);
+	int yDistance = abs(currentY - goalY);
+	
+	int hScore = (10 * (xDistance + yDistance)) - (6 * ((xDistance > yDistance) ? yDistance : xDistance));
+	
+	return hScore;
+}
+
+// Starts from goal node and each loop changes to the current node predecessor until it reaches the start node, increasing solution size by 1 each loop.
+void
+reconstruct_drunk_path(CalcDrunkPath_session *session, Node* goal, Node* start)
+{
+	Node* currentNode = goal;
+	
+	session->solution_size = 0;
+	while (currentNode->nodeAdress != start->nodeAdress)
+	{
+		currentNode = &session->currentMap[currentNode->predecessor];
+		session->solution_size++;
+	}
+}
+
+// Openlist is a binary heap of min-heap type
+// Each member in openList is the adress (nodeAdress) of a node in the map (session->currentMap)
+
+// Add node 'currentNode' to openList
+void 
+openListAdd_drunk (CalcDrunkPath_session *session, Node* currentNode)
+{
+	// Index will be 1 + last index in openList, which is also its size
+	// Save in currentNode its index in openList
+	currentNode->openListIndex = session->openListSize;
+	currentNode->whichlist = OPEN;
+	
+	// Defines openList[index] to currentNode adress
+	session->openList[currentNode->openListIndex] = currentNode->nodeAdress;
+	
+	// Increses openListSize by 1, since we just added a new member
+	session->openListSize++;
+	
+	long parentIndex = (long)floor((currentNode->openListIndex - 1) / 2);
+	Node* parentNode;
+	
+	// Repeat while currentNode still has a parent node, otherwise currentNode is the top node in the heap
+	while (parentIndex >= 0) {
+		
+		parentNode = &session->currentMap[session->openList[parentIndex]];
+		
+		// If parent node is bigger than currentNode, exchange their positions
+		if (parentNode->f > currentNode->f) {
+			// Changes the node adress of openList[currentNode->openListIndex] (which is 'currentNode') to that of openList[parentIndex] (which is the current parent of 'currentNode')
+			session->openList[currentNode->openListIndex] = session->openList[parentIndex];
+			
+			// Changes openListIndex of the current parent of 'currentNode' to that of 'currentNode' since they exchanged positions
+			parentNode->openListIndex = currentNode->openListIndex;
+			
+			// Changes the node adress of openList[parentIndex] (which is the current parent of 'currentNode') to that of openList[currentNode->openListIndex] (which is 'currentNode')
+			session->openList[parentIndex] = currentNode->nodeAdress;
+			
+			// Changes openListIndex of 'currentNode' to that of the current parent of 'currentNode' since they exchanged positions
+			currentNode->openListIndex = parentIndex;
+			
+			// Updates parentIndex to that of the current parent of 'currentNode'
+			parentIndex = (long)floor((currentNode->openListIndex - 1) / 2);
+			
+		} else {
+			break;
+		}
+	}
+}
+
+void 
+reajustOpenListItem_drunk (CalcDrunkPath_session *session, Node* currentNode)
+{
+	long parentIndex = (long)floor((currentNode->openListIndex - 1) / 2);
+	Node* parentNode;
+	
+	// Repeat while currentNode still has a parent node, otherwise currentNode is the top node in the heap
+	while (parentIndex >= 0) {
+		
+		parentNode = &session->currentMap[session->openList[parentIndex]];
+		
+		// If parent node is bigger than currentNode, exchange their positions
+		if (parentNode->f > currentNode->f) {
+			// Changes the node adress of openList[currentNode->openListIndex] (which is 'currentNode') to that of openList[parentIndex] (which is the current parent of 'currentNode')
+			session->openList[currentNode->openListIndex] = session->openList[parentIndex];
+			
+			// Changes openListIndex of the current parent of 'currentNode' to that of 'currentNode' since they exchanged positions
+			parentNode->openListIndex = currentNode->openListIndex;
+			
+			// Changes the node adress of openList[parentIndex] (which is the current parent of 'currentNode') to that of openList[currentNode->openListIndex] (which is 'currentNode')
+			session->openList[parentIndex] = currentNode->nodeAdress;
+			
+			// Changes openListIndex of 'currentNode' to that of the current parent of 'currentNode' since they exchanged positions
+			currentNode->openListIndex = parentIndex;
+			
+			// Updates parentIndex to that of the current parent of 'currentNode'
+			parentIndex = (long)floor((currentNode->openListIndex - 1) / 2);
+			
+		} else {
+			break;
+		}
+	}
+}
+
+Node* 
+openListGetLowest_drunk (CalcDrunkPath_session *session)
+{
+	session->openListSize--;
+	
+	Node* lowestNode = &session->currentMap[session->openList[0]];
+	
+	// Since it was decreaased, but the node was not removed yet, session->openListSize is now also the index of the last node in openList
+	// We move the last node in openList to this position and adjust it down as necessary
+	session->openList[lowestNode->openListIndex] = session->openList[session->openListSize];
+	
+	Node* movedNode;
+	
+	// Saves in movedNode that it now is the top node in openList
+	movedNode = &session->currentMap[session->openList[lowestNode->openListIndex]];
+	movedNode->openListIndex = lowestNode->openListIndex;
+	
+	// Saves in lowestNode that it is no longer in openList
+	lowestNode->whichlist = CLOSED;
+	lowestNode->openListIndex = 0;
+	
+	long smallerChildIndex;
+	Node* smallerChildNode;
+	
+	long rightChildIndex = 2 * movedNode->openListIndex + 2;
+	Node* rightChildNode;
+	
+	long leftChildIndex = 2 * movedNode->openListIndex + 1;
+	Node* leftChildNode;
+	
+	long lastIndex = session->openListSize-1;
+	
+	while (leftChildIndex <= lastIndex) {
+
+		//There are 2 children
+		if (rightChildIndex <= lastIndex) {
+			
+			rightChildNode = &session->currentMap[session->openList[rightChildIndex]];
+			leftChildNode = &session->currentMap[session->openList[leftChildIndex]];
+			
+			if (rightChildNode->f > leftChildNode->f) {
+				smallerChildIndex = leftChildIndex;
+			} else {
+				smallerChildIndex = rightChildIndex;
+			}
+		
+		//There is 1 children
+		} else {
+			smallerChildIndex = leftChildIndex;
+		}
+		
+		smallerChildNode = &session->currentMap[session->openList[smallerChildIndex]];
+		
+		if (movedNode->f > smallerChildNode->f) {
+			
+			// Changes the node adress of openList[movedNode->openListIndex] (which is 'movedNode') to that of openList[smallerChildIndex] (which is the current child of 'movedNode')
+			session->openList[movedNode->openListIndex] = smallerChildNode->nodeAdress;
+			
+			// Changes openListIndex of the current child of 'movedNode' to that of 'movedNode' since they exchanged positions
+			smallerChildNode->openListIndex = movedNode->openListIndex;
+			
+			// Changes the node adress of openList[smallerChildIndex] (which is the current child of 'movedNode') to that of openList[movedNode->openListIndex] (which is 'movedNode')
+			session->openList[smallerChildIndex] = movedNode->nodeAdress;
+			
+			// Changes openListIndex of 'movedNode' to that of the current child of 'movedNode' since they exchanged positions
+			movedNode->openListIndex = smallerChildIndex;
+			
+			// Updates rightChildIndex and leftChildIndex to those of the current children of 'movedNode'
+			rightChildIndex = 2 * movedNode->openListIndex + 2;
+			leftChildIndex = 2 * movedNode->openListIndex + 1;
+			
+		} else {
+			break;
+		}
+	}
+	
+	return lowestNode;
+}
+
+// Frees the memory allocated by currentMap
+void
+free_currentMap_drunk (CalcDrunkPath_session *session)
+{
+	free(session->currentMap);
+}
+
+// Frees the memory allocated by openList
+void
+free_openList_drunk (CalcDrunkPath_session *session)
+{
+	free(session->openList);
+}
+
+// Garantees that all memory allocations have been freed the drunkpath object is destroyed
+void
+CalcDrunkPath_destroy (CalcDrunkPath_session *session)
+{
+	if (session->initialized) {
+		free(session->currentMap);
+	}
+	if (session->run) {
+		free(session->openList);
+	}
+	free(session);
+}
+
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */

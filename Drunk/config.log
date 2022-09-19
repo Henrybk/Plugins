@@ -1,0 +1,6 @@
+file D:\Github\openkore\plugins\Drunk\SConstruct,line 176:
+	Configure(confdir = .sconf_temp)
+scons: Configure: Checking Perl configuration ...
+scons: Configure: (cached) yes
+
+
