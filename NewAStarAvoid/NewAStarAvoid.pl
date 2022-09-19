@@ -14,7 +14,7 @@ Plugins::register('NewAStarAvoid', 'Enables smart pathing using the dynamic aspe
 use constant {
 	PLUGIN_NAME => 'NewAStarAvoid',
 	ENABLE_MOVE => 1,
-	ENABLE_REMOVE => 1,
+	ENABLE_REMOVE => ,
 };
 
 my $hooks = Plugins::addHooks(
@@ -46,7 +46,7 @@ sub onUnload {
 
 my %mob_nameID_obstacles = (
 	1084 => { #black shrom
-		weight => 1000,
+		weight => 800,
 		dist => 7
 	},
 	1085 => { #red shrom
@@ -55,7 +55,7 @@ my %mob_nameID_obstacles = (
 	},
 	1368 => { # planta carnivora
 		weight => 1000,
-		dist => 4
+		dist => 10
 	},
 	1372 => { # bode
 		weight => 1000,
@@ -73,13 +73,15 @@ my %player_name_obstacles = (
 my %area_spell_type_obstacles = (
 	'127' => {
 		weight => 1000,
-		dist => 4
+		dist => 5
 	}
 );
 
 my %obstaclesList;
 
 my $mustRePath = 0;
+
+my $weight_limit = 127;
 
 sub on_packet_mapChange {
 	undef %obstaclesList;
@@ -195,6 +197,9 @@ sub get_final_grid {
 		my $position = $change->{y} * $field->{width} + $change->{x};
 		my $current_weight = unpack('C', substr($grid, $position, 1));
 		my $weight_changed = $current_weight + $change->{weight};
+		if ($weight_changed >= $weight_limit) {
+			$weight_changed = $weight_limit;
+		}
 		#warning "[".PLUGIN_NAME."] after  $change->{x} $change->{y} | $current_weight -> $weight_changed.\n";
 		substr($grid, $position, 1, pack('C', $weight_changed));
 	}
@@ -208,8 +213,8 @@ sub get_weight_for_block {
 		$dist = 1;
 	}
 	my $weight = int($ratio/($dist*$dist));
-	if ($weight >= 127) {
-		$weight = 127;
+	if ($weight >= $weight_limit) {
+		$weight = $weight_limit;
 	}
 	return $weight;
 }
