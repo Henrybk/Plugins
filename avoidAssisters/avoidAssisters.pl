@@ -20,6 +20,8 @@ sub onUnload {
 
 my %assisters_max = (
 	1013 => 1, #Wolf
+	1051 => 2, #Thief Bug
+	1053 => 2, #Thief Bug Female
 );
 
 sub on_checkMonsterAutoAttack {
