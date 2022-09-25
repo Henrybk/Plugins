@@ -1,89 +1,61 @@
-package Reconnect;
+# This package depends on two entries in control/timeouts.txt.
+#   * reconnect_backoff 30,60,180
+#   * reconnect_random 20
+# reconnect_backoff is a comma-separated list of timeouts which will be used in order when we get repeatedly disconnected from the server.
+# reconnect_random is the maximum random amount of time to be added to all reconnect times. This only applies if reconnect_backoff is defined. Default is zero.
+#
+package OpenKore::Plugins::reconnect;
 
-# Perl includes
 use strict;
 
-# Kore includes
-use Settings;
+use Globals qw( %config %masterServers %timeout );
+use Log qw( &message );
 use Plugins;
-use Network;
-use Globals;
-use Log qw(message);
+use Utils qw( &min );
+use Translation qw( &TF );
 
+our $default;
+our $counter = 0;
 
-our $reconnect ||=
-{
-    'timeout' =>
-    [
-		30,     # 30 seconds
-        30,     # 30 seconds
-        60,     # 1 minute
-        60,     # 1 minute
-        180,    # 3 minutes
-        180,    # 3 minutes
-        300,    # 5 minutes
-        300,    # 5 minutes
-        900,    # 15 minutes
-        900,    # 15 minutes
-        1800,   # 30 minutes
-        3600    # 1 hour
-    ],
+Plugins::register( 'reconnect', 'v1.0', \&unload );
 
-    'random'        => 20,
-    'counter'       => 0
-};
-
-Plugins::register("Reconnect", "Version 0.1 r8", \&unload);
-
-my $hooks = Plugins::addHooks(
-    ['Network::connectTo', \&trying_to_connect],
-    ['in_game', \&connected]
+my $hooks = Plugins::addHooks(    #
+	[ 'Network::connectTo' => \&trying_to_connect ],
+	[ 'in_game'            => \&connected ],
 );
 
 sub unload {
-	Plugins::delHooks($hooks);
+	Plugins::delHooks( $hooks );
 }
 
 sub trying_to_connect {
-	if ($reconnect->{counter} == 0) {
-		my $reconnectTime = @{$reconnect->{timeout}}[$reconnect->{counter}];
+	my ( undef, $params ) = @_;
+	return if($config{XKore} eq 1 || $config{XKore} eq 3);
+	# Only trigger if we're connecting to the login server.
+	next if $masterServers{ $config{master} }->{ip} ne $params->{host};
+	next if $masterServers{ $config{master} }->{port} ne $params->{port};
 
-		if($reconnect->{random}) {
-			$reconnectTime += int(rand($reconnect->{random}));
-		}
+    my $timeout = timeout();
 
-		$timeout{reconnect} = {'timeout' => $reconnectTime};
-		
-		$reconnect->{counter}++;
-		
-		return;
-	}
-	
-	my $reconnectTime = @{$reconnect->{timeout}}[$reconnect->{counter}];
-	
-	message "[Reconnect] Login retry number '".$reconnect->{counter}."', setting reconnect timeout to ".$reconnectTime." seconds.\n", 'success';
+	$timeout{reconnect} = { timeout => timeout() };
+	$counter++;
 
-	if ($reconnect->{random}) {
-		$reconnectTime += int(rand($reconnect->{random}));
-	}
-	
-	$timeout{reconnect} = {'timeout' => $reconnectTime};
-
-	if ($reconnect->{counter} < $#{$reconnect->{timeout}}) {
-		$reconnect->{counter}++;
+	if ( $counter > 1 ) {
+		message TF( "[reconnect] Login retry number %d, setting reconnect timeout to %d seconds.\n", $counter, $timeout{reconnect}->{timeout} ), 'success';
 	}
 }
 
 sub connected {
-    $reconnect->{counter} = 0;
+	return if($config{XKore} eq 1 || $config{XKore} eq 3);
+	$counter = 0;
+	$timeout{reconnect} = { timeout => timeout() };
+}
 
-    my $reconnectTime = @{$reconnect->{timeout}}[$reconnect->{counter}];
-
-    if ($reconnect->{random})  {
-        $reconnectTime += int(rand($reconnect->{random}));
-    }
-
-    $timeout{reconnect} = {'timeout' => $reconnectTime};
+# Return the current timeout if there is one.
+sub timeout {
+	my @timeouts = split /\s*,\s*/, $timeout{reconnect_backoff}->{timeout} || '';
+	return $timeout{reconnect}->{timeout} if !@timeouts;
+	$timeouts[ min( $counter, $#timeouts ) ] + int rand( $timeout{reconnect_random}->{timeout} || 0 );
 }
 
 1;

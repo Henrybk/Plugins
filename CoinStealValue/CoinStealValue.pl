@@ -129,7 +129,7 @@ sub extendedCheck {
 
 	return 0 if !$args->{monster} || $args->{monster}->{nameID} eq '';
 
-	if (my $value = $config{$args->{prefix} . '_zenyPerSP'}) {
+	if (my $value = $config{$args->{prefix} . '_MugZenyPerSP'}) {
 		my $sp_value = get_zenyPerSP($args->{monster});
 		return $args->{return} = 0 if ($sp_value == 0);
 		return $args->{return} = 0 unless (inRange($sp_value, $value));

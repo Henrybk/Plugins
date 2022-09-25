@@ -17,7 +17,7 @@ use constant {
 	PLUGIN_NAME => 'randItemsTakeTimeout',
 };
 
-my @rand_percent = (-50..50);
+my @rand_percent = (-60..40);
 
 sub Unload {
 	Plugins::delHook($hooks);
@@ -35,7 +35,7 @@ sub on_ai_items_take {
 	
 	AI::args->{ai_items_take_delay}{timeout} = $new;
 	
-	warning "[".PLUGIN_NAME."] Randoming items take timeout from $original to $new\n";
+	debug "[".PLUGIN_NAME."] Randoming items take timeout from $original to $new\n";
 	
 	return;
 }

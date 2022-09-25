@@ -28,6 +28,9 @@ sub on_unload {
 	Settings::removeFile($file_handle) if (defined $file_handle);
 	undef $file_handle;
 	undef $betterWalk_file;
+	undef $planStep;
+	undef $reverseOnEnd;
+	undef %walkMaps;
 }
 
 sub on_configModify {
@@ -75,9 +78,8 @@ sub parseWalkPlan {
 }
 
 sub on_ai_processRandomWalk {
-	my ($self, $args) = @_;
+	my (undef, $args) = @_;
 	
-	#$args->{return} = 1;
 	my $field_name = $field->baseName;
 	if ($config{betterWalkPlan} && exists($walkMaps{$field_name}) && timeOut($walkMaps{$field_name})) {
 		
@@ -85,19 +87,21 @@ sub on_ai_processRandomWalk {
 		my $routeX = $step->{x};
 		my $routeY = $step->{y};
 		
+		my $again = 0;
 		if (!$field->isWalkable($routeX, $routeY)) {
-			error TF("Invalid coordinates specified (%d, %d) for BetterWalkPlan (coordinates are unwalkable); BetterWalkPlan disabled\n", $routeX, $routeY);
-			configModify('betterWalkPlan', 0);
-			return;
+			error "Invalid coordinates specified (".$routeX.", ".$routeY.") for BetterWalkPlan (coordinates are unwalkable); step $planStep of plan: ".$field->descString()."\n";
+			#configModify('betterWalkPlan', 0);
+			$again = 1;
+		} else {
+			message ("[BetterWP] Following step $planStep of plan to: ".$field->descString().": ".$routeX.", ".$routeY."\n", "route");
+			ai_route(
+				$field_name, $routeX, $routeY, 
+				maxRouteTime => $config{route_randomWalk_maxRouteTime},
+				attackOnRoute => 2,
+				noMapRoute => ($config{route_randomWalk} == 2 ? 1 : 0),
+				isRandomWalk => 1
+			);
 		}
-		message ("[BetterWP] Following step $planStep of plan to: ".$field->descString().": ".$routeX.", ".$routeY."\n", "route");
-		ai_route(
-			$field_name, $routeX, $routeY, 
-			maxRouteTime => $config{route_randomWalk_maxRouteTime},
-			attackOnRoute => 2,
-			noMapRoute => ($config{route_randomWalk} == 2 ? 1 : 0),
-			isRandomWalk => 1
-		);
 		if (
 			   ($planStep == $#{$walkMaps{$field_name}{instructions}} && !$walkMaps{$field_name}{reverseOnEnd})
 			|| ($planStep == 0 && $reverseOnEnd == 1)
@@ -113,7 +117,11 @@ sub on_ai_processRandomWalk {
 		} else {
 			if ($reverseOnEnd == 0) { $planStep++; } else { $planStep--; };
 		}
-		$args->{return} = 1;
+		if ($again == 0) {
+			$args->{return} = 1;
+		} else {
+			on_ai_processRandomWalk(undef, $args);
+		}
 	}
 }
 

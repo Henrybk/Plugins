@@ -41,7 +41,17 @@ sub ongetRoute {
 	
 	return if (!defined $args->{self_call} || !$args->{self_call});
 	return if (!exists $config{"drunk"} || !defined $config{"drunk"} || !$config{"drunk"});
-	return if ($args->{self}{isSlaveRescue} || $args->{self}{isMoveNearSlave} ||  $args->{self}{LOSSubRoute} ||  $args->{self}{meetingSubRoute});
+	return if (
+		   $args->{self}{LOSSubRoute}
+		|| $args->{self}{meetingSubRoute}
+		|| $args->{self}{isIdleWalk}
+		|| $args->{self}{isSlaveRescue}
+		|| $args->{self}{isMoveNearSlave}
+		|| $args->{self}{isEscape}
+		|| $args->{self}{isItemTake}
+		|| $args->{self}{isItemGather}
+		|| $args->{self}{runFromTarget}
+	);
 	
 	my $drunk = $config{"drunk"};
 	

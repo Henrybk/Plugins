@@ -14,7 +14,7 @@ Plugins::register('NewAStarAvoid', 'Enables smart pathing using the dynamic aspe
 use constant {
 	PLUGIN_NAME => 'NewAStarAvoid',
 	ENABLE_MOVE => 1,
-	ENABLE_REMOVE => ,
+	ENABLE_REMOVE => 1,
 };
 
 my $hooks = Plugins::addHooks(
@@ -45,39 +45,29 @@ sub onUnload {
 }
 
 my %mob_nameID_obstacles = (
-	1084 => { #black shrom
-		weight => 800,
-		dist => 7
-	},
-	1085 => { #red shrom
-		weight => 1000,
-		dist => 4
-	},
 	1368 => { # planta carnivora
 		weight => 1000,
 		dist => 10
-	},
-	1372 => { # bode
-		weight => 1000,
-		dist => 4
 	}
 );
 
 my %player_name_obstacles = (
-	'testCreator' => {
+	'mage' => {
 		weight => 1000,
-		dist => 4
+		dist => 10
 	}
 );
 
 my %area_spell_type_obstacles = (
 	'127' => {
 		weight => 1000,
-		dist => 5
+		dist => 1
 	}
 );
 
 my %obstaclesList;
+
+my %removed_obstacle_still_in_list;
 
 my $mustRePath = 0;
 
@@ -93,7 +83,13 @@ sub on_packet_mapChange {
 ###################################################
 
 sub add_obstacle {
-	my ($actor, $obstacle) = @_;
+	my ($actor, $obstacle, $type) = @_;
+	
+	if (exists $removed_obstacle_still_in_list{$actor->{ID}}) {
+		warning "[".PLUGIN_NAME."] New obstacle $actor on location ".$actor->{pos}{x}." ".$actor->{pos}{y}." already exists in removed_obstacle_still_in_list, deleting from it and updating position.\n";
+		delete $obstaclesList{$actor->{ID}};
+		delete $removed_obstacle_still_in_list{$actor->{ID}};
+	}
 	
 	warning "[".PLUGIN_NAME."] Adding obstacle $actor on location ".$actor->{pos}{x}." ".$actor->{pos}{y}.".\n";
 	
@@ -101,12 +97,16 @@ sub add_obstacle {
 	
 	$obstaclesList{$actor->{ID}}{pos_to} = $actor->{pos_to};
 	$obstaclesList{$actor->{ID}}{weight} = $weight_changes;
+	$obstaclesList{$actor->{ID}}{type} = $type;
+	if ($type eq 'monster') {
+		$obstaclesList{$actor->{ID}}{nameID} = $actor->{nameID};
+	}
 	
 	$mustRePath = 1;
 }
 
 sub move_obstacle {
-	my ($actor, $obstacle) = @_;
+	my ($actor, $obstacle, $type) = @_;
 	
 	return unless (ENABLE_MOVE);
 	
@@ -116,20 +116,34 @@ sub move_obstacle {
 	
 	$obstaclesList{$actor->{ID}}{pos_to} = $actor->{pos_to};
 	$obstaclesList{$actor->{ID}}{weight} = $weight_changes;
+	$obstaclesList{$actor->{ID}}{type} = $type;
 	
 	$mustRePath = 1;
 }
 
 sub remove_obstacle {
-	my ($actor) = @_;
+	my ($actor, $type) = @_;
 	
 	return unless (ENABLE_REMOVE);
 	
-	warning "[".PLUGIN_NAME."] Removing obstacle $actor from ".$actor->{pos}{x}." ".$actor->{pos}{y}.".\n";
 	
-	delete $obstaclesList{$actor->{ID}};
+	my $realMyPos = calcPosition($char);
+	my $dist = blockDistance($realMyPos, $obstaclesList{$actor->{ID}}{pos_to});
 	
-	$mustRePath = 1;
+	my $sight = $config{clientSight};
+	
+	if ($dist >= $sight && ($type eq 'monster' || $type eq 'player')) {
+		
+		$removed_obstacle_still_in_list{$actor->{ID}}{time} = time;
+		$removed_obstacle_still_in_list{$actor->{ID}}{timeout} = 3;
+		$removed_obstacle_still_in_list{$actor->{ID}}{type} = $type;
+		warning "[".PLUGIN_NAME."] Putting obstacle $actor from ".$actor->{pos}{x}." ".$actor->{pos}{y}." in to the removed_obstacle_still_in_list.\n";
+	
+	} else {
+		warning "[".PLUGIN_NAME."] Removing obstacle $actor from ".$actor->{pos}{x}." ".$actor->{pos}{y}.".\n"; 
+		delete $obstaclesList{$actor->{ID}};
+		$mustRePath = 1;
+	}
 }
 
 ###################################################
@@ -137,16 +151,72 @@ sub remove_obstacle {
 ###################################################
 
 sub on_AI_pre_manual {
-	return unless (AI::is("route"));
+	on_AI_pre_manual_removed_obstacle_still_in_list();
+	on_AI_pre_manual_repath();
+}
+
+sub on_AI_pre_manual_removed_obstacle_still_in_list {
+	my @obstacles = keys(%removed_obstacle_still_in_list);
+	return unless (@obstacles > 0);
+	
+	#warning "[".PLUGIN_NAME."] removed_obstacle_still_in_list: ".(scalar @obstacles)."\n";
+	
+	OBSTACLE: foreach my $obstacle_ID (@obstacles) {
+		my $obstacle = $obstaclesList{$obstacle_ID};
+		my $obstacle_last_pos = $obstacle->{pos_to};
+		
+		my $realMyPos = calcPosition($char);
+		my $dist = blockDistance($realMyPos, $obstacle_last_pos);
+		my $sight = ($config{clientSight}-2); # 2 cell leeway?
+		next OBSTACLE unless ($dist < $sight);
+		
+		my $target;
+		#LIST: foreach my $list ($playersList, $monstersList, $npcsList, $petsList, $portalsList, $slavesList, $elementalsList) {
+		
+		if ($removed_obstacle_still_in_list{$obstacle_ID}{type} eq 'monster') {
+			my $actor = $monstersList->getByID($obstacle_ID);
+			if ($actor) {
+				$target = $actor;
+			}
+		} elsif ($removed_obstacle_still_in_list{$obstacle_ID}{type} eq 'player') {
+			my $actor = $playersList->getByID($obstacle_ID);
+			if ($actor) {
+				$target = $actor;
+			}
+		}
+		
+		# Should never happen
+		if ($target) {
+			warning "[REMOVING TEST] wwwwttttffffff 1.\n";
+		} else {
+			delete $obstaclesList{$obstacle_ID};
+			delete $removed_obstacle_still_in_list{$obstacle_ID};
+			warning "[REMOVING TEST] Removing obstacle from ".$obstacle_last_pos->{x}." ".$obstacle_last_pos->{y}.".\n";
+			$mustRePath = 1;
+		}
+	}
+}
+
+sub on_AI_pre_manual_repath {
 	return unless ($mustRePath);
 	
-	my $task;
+	my $arg_i;
+	if (AI::is("route")) {
+		$arg_i = 0;
+	} elsif (AI::action eq "move" && AI::action (1) eq "route") {
+		$arg_i = 1;
+	} else {
+		return;
+	}
 	
-	if (UNIVERSAL::isa($char->args, 'Task::Route')) {
-		$task = $char->args;
+	my $task;
+	my $args = AI::args($arg_i);
+	
+	if (UNIVERSAL::isa($args, 'Task::Route')) {
+		$task = $args;
 		
-	} elsif ($char->args->getSubtask && UNIVERSAL::isa($char->args->getSubtask, 'Task::Route')) {
-		$task = $char->args->getSubtask;
+	} elsif ($args->getSubtask && UNIVERSAL::isa($args->getSubtask, 'Task::Route')) {
+		$task = $args->getSubtask;
 		
 	} else {
 		return;
@@ -169,11 +239,11 @@ sub on_PathFindingReset {
 	
 	my @obstacles = keys(%obstaclesList);
 	
-	warning "[".PLUGIN_NAME."] on_PathFindingReset before check, there are ".@obstacles." obstacles.\n";
+	#warning "[".PLUGIN_NAME."] on_PathFindingReset before check, there are ".@obstacles." obstacles.\n";
 	
 	return unless (@obstacles > 0);
 	
-	Log::warning "[test] Using grided info.\n";
+	Log::warning "[test] on_PathFindingReset: Using grided info for ".@obstacles." obstacles.\n";
 	
 	$args->{args}{weight_map} = \(get_final_grid());
 	$args->{args}{width} = $args->{args}{field}{width} unless ($args->{args}{width});
@@ -264,7 +334,7 @@ sub sum_all_changes {
 	#warning "[".PLUGIN_NAME."] 1 obstaclesList: ". Data::Dumper::Dumper \%obstaclesList;
 	
 	foreach my $key (keys %obstaclesList) {
-		warning "[".PLUGIN_NAME."] sum_all_avoid - testing obstacle at $obstaclesList{$key}{pos_to}{x} $obstaclesList{$key}{pos_to}{y}.\n";
+		#warning "[".PLUGIN_NAME."] sum_all_avoid - testing obstacle at $obstaclesList{$key}{pos_to}{x} $obstaclesList{$key}{pos_to}{y}.\n";
 		foreach my $change (@{$obstaclesList{$key}{weight}}) {
 			my $x = $change->{x};
 			my $y = $change->{y};
@@ -298,7 +368,7 @@ sub on_add_player_list {
 	
 	my %obstacle = %{$player_name_obstacles{$actor->{name}}};
 	
-	add_obstacle($actor, \%obstacle);
+	add_obstacle($actor, \%obstacle, 'player');
 }
 
 sub on_player_moved {
@@ -309,7 +379,7 @@ sub on_player_moved {
 	
 	my %obstacle = %{$player_name_obstacles{$actor->{name}}};
 	
-	move_obstacle($actor, \%obstacle);
+	move_obstacle($actor, \%obstacle, 'player');
 }
 
 sub on_player_disappeared {
@@ -318,7 +388,7 @@ sub on_player_disappeared {
 	
 	return unless (exists $obstaclesList{$actor->{ID}});
 	
-	remove_obstacle($actor);
+	remove_obstacle($actor, 'player');
 }
 
 ###################################################
@@ -333,7 +403,7 @@ sub on_add_monster_list {
 	
 	my %obstacle = %{$mob_nameID_obstacles{$actor->{nameID}}};
 	
-	add_obstacle($actor, \%obstacle);
+	add_obstacle($actor, \%obstacle, 'monster');
 }
 
 sub on_monster_moved {
@@ -344,7 +414,7 @@ sub on_monster_moved {
 	
 	my %obstacle = %{$mob_nameID_obstacles{$actor->{nameID}}};
 	
-	move_obstacle($actor, \%obstacle);
+	move_obstacle($actor, \%obstacle, 'monster');
 }
 
 sub on_monster_disappeared {
@@ -353,7 +423,7 @@ sub on_monster_disappeared {
 	
 	return unless (exists $obstaclesList{$actor->{ID}});
 	
-	remove_obstacle($actor);
+	remove_obstacle($actor, 'monster');
 }
 
 ###################################################
@@ -371,7 +441,7 @@ sub on_add_areaSpell_list {
 	
 	my %obstacle = %{$area_spell_type_obstacles{$spell->{type}}};
 	
-	add_obstacle($spell, \%obstacle);
+	add_obstacle($spell, \%obstacle, 'spell');
 }
 
 sub on_areaSpell_disappeared {
@@ -381,7 +451,7 @@ sub on_areaSpell_disappeared {
 	
 	return unless (exists $obstaclesList{$spell->{ID}});
 	
-	remove_obstacle($spell);
+	remove_obstacle($spell, 'spell');
 }
 
 return 1;
