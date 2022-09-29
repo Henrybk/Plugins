@@ -1,6 +1,28 @@
+##############################
+# =======================
+# BetterWalkPlan v3
+# =======================
+# This plugin is licensed under the GNU GPL
+# Created by Henrybk from openkore brasil
+# Based on the waypoint (made by d3fc0n https://forums.openkore.com/viewtopic.php?t=725) and planwalk (made by sofax222 https://forums.openkore.com/viewtopic.php?t=13558)
+#
+#
+# What it does: Plan your lockmap traversing on a config file, now with JSON
+#
+# Config keys (put in config.txt):
+#	BetterShopper_on 1
+#
+# config files:
+#	walk.json
+#
+# Recommended json validator:
+#	https://jsonformatter.curiousconcept.com/#
+#
+###############################################
 package BetterWalkPlan;
 
 use strict;
+use Plugins;
 use Globals;
 use Utils;
 use Misc;
@@ -10,13 +32,15 @@ use Translation;
 use File::Spec;
 use JSON::Tiny qw(from_json to_json);
 
+use List::Util qw(shuffle);
+
 my $planStep = 0;
 my $reverseOnEnd = 0;
 my $file_handle;
 my $betterWalk_file = "walk.json";
 my %walkMaps;
 
-Plugins::register('BetterWalkPlan', 'Revised waypoint/planwalk 3.0', \&on_unload, \&on_unload);
+Plugins::register('BetterWalkPlan', 'New and revised waypoint/planwalk', \&on_unload, \&on_unload);
 
 my $hooks = Plugins::addHooks(
 	['configModify',			\&on_configModify],
@@ -35,7 +59,7 @@ sub on_unload {
 
 sub on_configModify {
 	my (undef, $args) = @_;
-	if ($args->{key} eq 'betterWalkPlan') {
+	if ($args->{key} eq 'BetterWalkPlan') {
 		$planStep = 0;
 		$reverseOnEnd = 0;
 		
@@ -81,19 +105,33 @@ sub on_ai_processRandomWalk {
 	my (undef, $args) = @_;
 	
 	my $field_name = $field->baseName;
-	if ($config{betterWalkPlan} && exists($walkMaps{$field_name}) && timeOut($walkMaps{$field_name})) {
+	if ($config{BetterWalkPlan} && exists($walkMaps{$field_name}) && timeOut($walkMaps{$field_name})) {
 		
-		my $step = $walkMaps{$field_name}{instructions}[$planStep];
+		if (!exists $walkMaps{$field_name}{traversingOrder}) {
+			$planStep = 0;
+			$reverseOnEnd = 0;
+		}
+		
+		if ($planStep == 0) {
+			@{$walkMaps{$field_name}{traversingOrder}} = (0..$#{$walkMaps{$field_name}{instructions}});
+			if ($walkMaps{$field_name}{random} == 1) {
+				@{$walkMaps{$field_name}{traversingOrder}} = shuffle(@{$walkMaps{$field_name}{traversingOrder}});
+			}
+			message ("[BetterWP] Traversing order will be ".(join(' ', @{$walkMaps{$field_name}{traversingOrder}}))."\n", "route");
+		}
+		
+		my $traverseStep = $walkMaps{$field_name}{traversingOrder}[$planStep];
+		my $step = $walkMaps{$field_name}{instructions}[$traverseStep];
 		my $routeX = $step->{x};
 		my $routeY = $step->{y};
 		
 		my $again = 0;
 		if (!$field->isWalkable($routeX, $routeY)) {
 			error "Invalid coordinates specified (".$routeX.", ".$routeY.") for BetterWalkPlan (coordinates are unwalkable); step $planStep of plan: ".$field->descString()."\n";
-			#configModify('betterWalkPlan', 0);
+			#configModify('BetterWalkPlan', 0);
 			$again = 1;
 		} else {
-			message ("[BetterWP] Following step $planStep of plan to: ".$field->descString().": ".$routeX.", ".$routeY."\n", "route");
+			message ("[BetterWP] Following step $traverseStep of plan to: ".$field->descString().": ".$routeX.", ".$routeY."\n", "route");
 			ai_route(
 				$field_name, $routeX, $routeY, 
 				maxRouteTime => $config{route_randomWalk_maxRouteTime},
